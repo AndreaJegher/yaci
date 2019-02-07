@@ -1,46 +1,217 @@
 package chord
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/rpc"
 )
 
 type (
-  //Ring rapresents a chord ring of peers
-	Ring struct {
-    RingID string
-    ModuloExponent int
-    Modulo int
+	//Node rapresents a node on a chord node of peers
+	Node struct {
+		ID             string
+		ModuloExponent uint
+		ModuloBase     int
+		Modulo         int
+		Location       NodeLocation
+		SuccessorNode  NodeLocation
+		FingerTable    []NodeLocation
 	}
 
-  //Node rapresents a node in a ring
-  Node struct {
-  }
+	//NodeLocation holds the location of a node
+	NodeLocation struct {
+		RingName string
+		Address  net.IP
+		Port     int
+	}
 )
 
-func genNodeIdentifier(ip net.IP) string {
-	return fmt.Sprintf("%x", sha1.Sum([]byte(ip.String())))
+func externalIP() (net.IP, error) {
+	var ip net.IP
+	ifaces, err := net.Interfaces()
+
+	if err != nil {
+		return ip, err
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 {
+			continue // interface down
+		}
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue // loopback interface
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return ip, err
+		}
+		for _, addr := range addrs {
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			ip = ip.To4()
+			if ip == nil {
+				continue // not an ipv4 address
+			}
+			return ip, nil
+		}
+	}
+	return ip, errors.New("there are no available network")
 }
 
-func genKeyIdentifier(key string) string {
-	return fmt.Sprintf("%x", sha1.Sum([]byte(key)))
+//GenID generate a valid entity identifier
+func GenID(item string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(item)))
 }
 
-//CreateRing creates a new chord ring and returns an object rapresenting the ring, the rindID
-func CreateRing(ringID string) (Ring, error) {
-  var ring Ring
-  return ring, nil
+//JoinRing connects to a chord node and returns an object rapresenting the node
+func JoinRing(name string, destport, localport int) (Node, error) {
+	var node Node
+
+	client, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", name, destport))
+	if err != nil {
+		return node, err
+	}
+
+	method := "Node.Join"
+	arg := localport
+
+	err = client.Call(method, arg, &node)
+	if err != nil {
+		return node, err
+	}
+
+	rpc.Register(node)
+	rpc.HandleHTTP()
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", localport))
+	if err != nil {
+		return node, err
+	}
+	node.Location.Port = localport
+	ip, err := externalIP()
+	if err != nil {
+		return node, nil
+	}
+	node.Location.Address = ip
+	node.ID = GenID(ip.String())
+
+	go http.Serve(l, nil)
+	return node, nil
 }
 
-//JoinRing connects to a chord ring and returns an object rapresenting the ring
-func JoinRing(ringID string) (Ring, error) {
-  var ring Ring
-  return ring, nil
+//CreateRing creates a new chord node and returns an object rapresenting the node
+func CreateRing(name string, port int) (Node, error) {
+	var node Node
+
+	rpc.Register(node)
+	rpc.HandleHTTP()
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return node, err
+	}
+
+	node.Location.RingName = name
+	node.ModuloExponent = 6
+	node.ModuloBase = 2
+	node.Modulo = node.ModuloBase << node.ModuloExponent
+	node.Location.Port = port
+	ip, err := externalIP()
+	if err != nil {
+		return node, nil
+	}
+	node.Location.Address = ip
+	node.ID = GenID(ip.String())
+
+	go http.Serve(l, nil)
+	return node, nil
 }
 
-//MapKey maps a key onto a node
-func (ring Ring) MapKey(key string) (Node, error) {
-  var node Node
-  return node, nil
+//LeaveRing select the new successor node and leaves the network
+func LeaveRing(node Node) error {
+	next := node.SuccessorNode
+	prev, err := node.Lookup(GenID(node.Location.Address.String()))
+	if err != nil {
+		return err
+	}
+
+	client, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", prev.Location.Address, prev.Location.Port))
+	if err != nil {
+		return err
+	}
+
+	var reply error
+	method := "Node.Leave"
+	arg := next
+
+	err = client.Call(method, arg, &reply)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//Join handles a node joining a node
+func (node Node) Join(joiningNodeIP net.IP, joiningNodePort int) (Node, error) {
+	var newNode Node
+
+	prev, err := node.Lookup(GenID(joiningNodeIP.String()))
+	if err != nil {
+		return newNode, err
+	}
+
+	newNode.Location.RingName = node.Location.RingName
+	newNode.ModuloExponent = node.ModuloExponent
+	newNode.ModuloBase = node.ModuloBase
+	newNode.Modulo = node.Modulo
+	next := prev.SuccessorNode
+
+	newNode.SuccessorNode = next
+	prev.SuccessorNode.Address = joiningNodeIP
+	prev.SuccessorNode.Port = joiningNodePort
+
+	return newNode, nil
+}
+
+//Leave handles disconnection of the local node from the node
+func (node Node) Leave(next NodeLocation) error {
+	node.SuccessorNode = next
+	return nil
+}
+
+//Lookup finds the node holding the key (scalable implementation)
+func (node Node) Lookup(keyID string) (Node, error) {
+	return node, nil
+}
+
+//SimpleLookup finds the node holding the key (simple implementation)
+func (node Node) SimpleLookup(keyID string) (NodeLocation, error) {
+	var nodeLocation NodeLocation
+
+	// TODO: Local check
+
+	succ := node.SuccessorNode
+
+	client, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", succ.Address, succ.Port))
+	if err != nil {
+		return nodeLocation, err
+	}
+
+	method := "Node.SimpleLookup"
+	arg := keyID
+
+	err = client.Call(method, arg, &nodeLocation)
+	if err != nil {
+		return nodeLocation, err
+	}
+
+	return nodeLocation, nil
 }
