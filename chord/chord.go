@@ -109,7 +109,7 @@ func JoinRing(name string, destport, localport int) (Node, error) {
 }
 
 //CreateRing creates a new chord node and returns an object rapresenting the node
-func CreateRing(name string, port int) (Node, error) {
+func CreateRing(name string, port, base int, exponent uint) (Node, error) {
 	var node Node
 
 	rpc.Register(node)
@@ -120,8 +120,8 @@ func CreateRing(name string, port int) (Node, error) {
 	}
 
 	node.Location.RingName = name
-	node.ModuloExponent = 64
-	node.ModuloBase = 1
+	node.ModuloBase = base
+	node.ModuloExponent = exponent
 	node.Modulo = uint64(node.ModuloBase << node.ModuloExponent - 1)
 	node.Location.Port = port
 	ip, err := externalIP()
