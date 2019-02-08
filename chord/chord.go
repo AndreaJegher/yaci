@@ -15,9 +15,10 @@ type (
 		ID             string
 		ModuloExponent uint
 		ModuloBase     int
-		Modulo         int
+		Modulo         uint64
 		Location       NodeLocation
-		SuccessorNode  NodeLocation
+		NextNode  NodeLocation
+		PrevNode  NodeLocation
 		FingerTable    []NodeLocation
 	}
 
@@ -119,9 +120,9 @@ func CreateRing(name string, port int) (Node, error) {
 	}
 
 	node.Location.RingName = name
-	node.ModuloExponent = 6
-	node.ModuloBase = 2
-	node.Modulo = node.ModuloBase << node.ModuloExponent
+	node.ModuloExponent = 64
+	node.ModuloBase = 1
+	node.Modulo = uint64(node.ModuloBase << node.ModuloExponent - 1)
 	node.Location.Port = port
 	ip, err := externalIP()
 	if err != nil {
@@ -136,7 +137,7 @@ func CreateRing(name string, port int) (Node, error) {
 
 //LeaveRing select the new successor node and leaves the network
 func LeaveRing(node Node) error {
-	next := node.SuccessorNode
+	next := node.NextNode
 	prev, err := node.Lookup(GenID(node.Location.Address.String()))
 	if err != nil {
 		return err
@@ -172,18 +173,18 @@ func (node Node) Join(joiningNodeIP net.IP, joiningNodePort int) (Node, error) {
 	newNode.ModuloExponent = node.ModuloExponent
 	newNode.ModuloBase = node.ModuloBase
 	newNode.Modulo = node.Modulo
-	next := prev.SuccessorNode
+	next := prev.NextNode
 
-	newNode.SuccessorNode = next
-	prev.SuccessorNode.Address = joiningNodeIP
-	prev.SuccessorNode.Port = joiningNodePort
+	newNode.NextNode = next
+	prev.NextNode.Address = joiningNodeIP
+	prev.NextNode.Port = joiningNodePort
 
 	return newNode, nil
 }
 
 //Leave handles disconnection of the local node from the node
 func (node Node) Leave(next NodeLocation) error {
-	node.SuccessorNode = next
+	node.NextNode = next
 	return nil
 }
 
@@ -198,7 +199,7 @@ func (node Node) SimpleLookup(keyID string) (NodeLocation, error) {
 
 	// TODO: Local check
 
-	succ := node.SuccessorNode
+	succ := node.NextNode
 
 	client, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", succ.Address, succ.Port))
 	if err != nil {
