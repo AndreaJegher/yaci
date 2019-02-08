@@ -1,7 +1,7 @@
 package chord
 
 import (
-	"crypto/sha256"
+	"crypto/sha1"
 	"errors"
 	"fmt"
 	"net"
@@ -70,7 +70,7 @@ func externalIP() (net.IP, error) {
 
 //GenID generate a valid entity identifier
 func GenID(item string) string {
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(item)))
+	return fmt.Sprintf("%x", sha1.Sum([]byte(item)))
 }
 
 //JoinRing connects to a chord node and returns an object rapresenting the node
