@@ -123,6 +123,7 @@ func Create(name string, port, base int, exponent uint) (Node, error) {
 	n.ID = GenID(ip.String(), n.Ring.Modulo)
 	n.Next.Address = n.Address
 	n.Next.Port = n.Port
+	n.Running = true
 
 	go http.Serve(l, nil)
 	return n, nil
@@ -155,6 +156,8 @@ func Join(i NodeInfo) (Node, error) {
 
 	n.ID = GenID(ip.String(), n.Ring.Modulo)
 	n.Next = next
+	n.Running = true
+	
 	return n, nil
 }
 
