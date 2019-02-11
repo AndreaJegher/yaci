@@ -20,4 +20,7 @@
 /vendor/
 /Godeps/
 
+### Builds ###
+/build
+
 # End of https://www.gitignore.io/api/go
