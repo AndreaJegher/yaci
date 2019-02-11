@@ -147,6 +147,13 @@ func Join(i NodeInfo) (Node, error) {
 	if err != nil {
 		return n, err
 	}
+
+	ip, err := externalIP()
+	if err != nil {
+		return n, err
+	}
+	
+	n.ID = GenID(ip.String(), n.Ring.Modulo)
 	n.Next = next
 	return n, nil
 }
