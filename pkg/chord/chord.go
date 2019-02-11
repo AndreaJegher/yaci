@@ -26,6 +26,7 @@ type (
 		ID      uint64
 		Address net.IP
 		Port    int
+		Running bool
 	}
 
 	//RingInfo holds the ring metadata
@@ -34,7 +35,6 @@ type (
 		ModuloBase     int
 		Modulo         uint64
 		Name           string
-		Running        bool
 	}
 )
 
