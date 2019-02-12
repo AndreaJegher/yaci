@@ -184,6 +184,9 @@ func (n Node) closetPreceedingNode(key uint64) NodeInfo {
 				return val
 			}
 			prev = prev + 1
+			if uint64(prev) == key {
+				break
+			}
 	}
 	return n.NodeInfo
 }
