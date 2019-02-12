@@ -19,6 +19,7 @@ var (
   list = flag.Bool("list", false, "List local nodes and rings.")
   simple = flag.Bool("simple", false, "Use a simpler and less efficient lookup alghoritm. Included only for completeness.")
   name = flag.String("name", "homering.ga", "Hostname of a ring.")
+  remoteport = flag.Int("port", 6368, "Port of the host when joining.")
   key = flag.String("key", "00000", "Key of an item.")
   chordService = flag.String("csname", "localhost", "Address of the chord service.")
   chordServicePort = flag.Int("csport", 6367, "Port of the chord service.")
@@ -40,7 +41,8 @@ func main() {
   if *join {
     method = "Service.Join"
     args.Name = *name
-    args.Port = *port
+    args.Port = *remoteport
+    args.LocalPort = *port
   } else if *new {
     method = "Service.Create"
     args.Name = *name
