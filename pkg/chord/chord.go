@@ -125,9 +125,9 @@ func Create(i NodeInfo, r RingInfo) (*Node, error) {
 	}
 	n.Address = ip
 
+	n.Ring = r
 	n.NodeInfo = i
 	n.ID = GenID(n.Address.String(), n.Ring.Modulo)
-	n.Ring = r
 	n.Next = next
 	n.Running = true
 
