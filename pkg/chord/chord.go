@@ -100,7 +100,7 @@ func Create(name string, port, base int, exponent int) (Node, error) {
 	var n Node
 
 	rpc.Register(n)
-	rpc.HandleHTTP()
+	// ERR: check why this -> rpc.HandleHTTP() create error -> multiple registrations for /_goRPC_
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return n, err
@@ -121,6 +121,7 @@ func Create(name string, port, base int, exponent int) (Node, error) {
 	n.Next.Port = n.Port
 	n.Running = true
 
+ 	// TODO user ServeTLS
 	go http.Serve(l, nil)
 	return n, nil
 }
