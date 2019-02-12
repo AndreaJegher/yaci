@@ -39,12 +39,12 @@ func main() {
   var reply rpchelper.ServiceReply
 
   if *join {
-    method = "Service.Join"
+    method = "Service.JoinRing"
     args.Name = *name
     args.Port = *remoteport
     args.LocalPort = *port
   } else if *new {
-    method = "Service.Create"
+    method = "Service.CreateRing"
     args.Name = *name
     args.Port = *port
     args.Base = *base
