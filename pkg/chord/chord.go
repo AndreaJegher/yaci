@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
+	"log"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -36,12 +36,39 @@ type (
 		ModuloBase     int
 		Modulo         uint64
 		Name           string
+		Timeout        time.Duration
 	}
 )
 
-const (
-	sleepTime = 20 * time.Second
-)
+func dialNode(i NodeInfo) (*rpc.Client, error) {
+	return rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", i.Address, i.Port))
+}
+
+func keyInRange(k uint64, n, s NodeInfo) bool {
+	return k > n.ID && k <= s.ID
+}
+
+func serveNode(n *Node) {
+	rpc.Register(n)
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", n.Port))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	go func() {
+		var next uint64
+		for n.Running {
+			n.stabilize()
+			n.fixFinger(next)
+			next = next + 1
+			n.checkPredecessor()
+			time.Sleep(n.Ring.Timeout * time.Millisecond)
+		}
+		l.Close()
+	}()
+	log.Println(http.Serve(l, nil))
+}
 
 func externalIP() (net.IP, error) {
 	var ip net.IP
@@ -81,82 +108,69 @@ func externalIP() (net.IP, error) {
 	return ip, errors.New("there are no available network")
 }
 
-func dialNode(i NodeInfo) (*rpc.Client, error) {
-	return rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", i.Address, i.Port))
-}
-
-func keyInRange(k uint64, n, s NodeInfo) bool {
-	return k > n.ID && k <= s.ID
-}
-
 // GenID generate a valid entity identifier
 func GenID(item string, modulo uint64) uint64 {
 	sum := sha1.Sum([]byte(item))
 	return binary.LittleEndian.Uint64(sum[12:]) % modulo
 }
 
-// Create creates a new chord ring and returns a new node
-func Create(name string, port, base int, exponent int) (Node, error) {
-	var n Node
-
-	rpc.Register(n)
-	// ERR: check why this -> rpc.HandleHTTP() create error -> multiple registrations for /_goRPC_
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		return n, err
-	}
-
-	n.Ring.Name = name
-	n.Ring.ModuloBase = base
-	n.Ring.ModuloExponent = exponent
-	n.Ring.Modulo = uint64( math.Pow( float64(n.Ring.ModuloBase), float64(n.Ring.ModuloExponent) ) - 1)
-	n.Port = port
-	ip, err := externalIP()
-	if err != nil {
-		return n, nil
-	}
-	n.Address = ip
-	n.ID = GenID(ip.String(), n.Ring.Modulo)
-	n.Next.Address = n.Address
-	n.Next.Port = n.Port
-	n.Running = true
-
- 	// TODO user ServeTLS
-	go http.Serve(l, nil)
-	return n, nil
-}
-
-// Join a chord ring and returns a new node
-func Join(i NodeInfo) (Node, error) {
+// Create a chord ring and returns a new node
+func Create(i NodeInfo, r RingInfo) (*Node, error) {
 	var n Node
 	var next NodeInfo
 
+	ip, err := externalIP()
+	if err != nil {
+		return nil, err
+	}
+	n.Address = ip
+
+	n.NodeInfo = i
+	n.ID = GenID(n.Address.String(), n.Ring.Modulo)
+	n.Ring = r
+	n.Next = next
+	n.Running = true
+
+	n.Next = n.NodeInfo
+
+	go serveNode(&n)
+	return &n, nil
+}
+
+// Join a chord ring through i and returns a new node
+func Join(i NodeInfo, port int) (*Node, error) {
+	var n Node
+	var next NodeInfo
+
+	ip, err := externalIP()
+	if err != nil {
+		return nil, err
+	}
+	n.Address = ip
+
 	c, err := dialNode(i)
 	if err != nil {
-		return n, err
+		return nil, err
 	}
 
 	err = c.Call("WhichRing", nil, &n.Ring)
 	if err != nil {
-		return n, err
+		return nil, err
 	}
 
 	// newNode.Pred = nil
 	err = n.Lookup(GenID(i.Address.String(), n.Ring.Modulo), &next)
 	if err != nil {
-		return n, err
+		return nil, err
 	}
 
-	ip, err := externalIP()
-	if err != nil {
-		return n, err
-	}
-
-	n.ID = GenID(ip.String(), n.Ring.Modulo)
+	n.ID = GenID(n.Address.String(), n.Ring.Modulo)
+	n.Port = port
 	n.Next = next
 	n.Running = true
 
-	return n, nil
+	go serveNode(&n)
+	return &n, nil
 }
 
 // fixFinger refreshes finger table
@@ -180,13 +194,13 @@ func (n Node) checkPredecessor() error {
 func (n Node) closetPreceedingNode(key uint64) NodeInfo {
 	prev := 1
 	for {
-			if val, ok := n.FingerTable[(key - uint64(prev))%n.Ring.Modulo]; ok {
-				return val
-			}
-			prev = prev + 1
-			if uint64(prev) == key {
-				break
-			}
+		if val, ok := n.FingerTable[(key-uint64(prev))%n.Ring.Modulo]; ok {
+			return val
+		}
+		prev = prev + 1
+		if uint64(prev) == key {
+			break
+		}
 	}
 	return n.NodeInfo
 }

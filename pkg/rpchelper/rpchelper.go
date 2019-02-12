@@ -9,6 +9,7 @@ type (
   ServiceArgs struct {
     Name string
     Port int
+    LocalPort int
     Key string
     Base int
     Exponent int
