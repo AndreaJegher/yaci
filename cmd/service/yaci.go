@@ -10,6 +10,7 @@ import (
 	"net/rpc"
 
 	"../../pkg/chord"
+	"../../pkg/rpchelper"
 )
 
 var (
@@ -24,8 +25,11 @@ type (
 )
 
 //Join handles joinig a ring
-func (s Service) Join(name string, port int) error {
+func (s Service) Join(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	var i chord.NodeInfo
+	name := args.Name
+	port := args.Port
+
 	i.Port = port
 	ips, err := net.LookupIP(name)
 	if err != nil {
@@ -50,7 +54,12 @@ func (s Service) Join(name string, port int) error {
 }
 
 //Create handles createing a ring
-func (s Service) Create(name string, port, base int, exponent uint) error {
+func (s Service) Create(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
+	name := args.Name
+	port := args.Port
+	base := args.Base
+	exponent := args.Exponent
+
 	node, err := chord.Create(name, port, base, exponent)
 	if err != nil {
 		return err
@@ -60,7 +69,8 @@ func (s Service) Create(name string, port, base int, exponent uint) error {
 }
 
 //Leave handles leaving a ring
-func (s Service) Leave(name string) error {
+func (s Service) Leave(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
+	name := args.Name
 	node, ok := nodes[name]
 	if ok {
 		node.Running = false
@@ -70,23 +80,39 @@ func (s Service) Leave(name string) error {
 }
 
 //Lookup handles lookup a key in a ring
-func (s Service) Lookup(name string, key uint64) (chord.NodeInfo, error) {
-	var i chord.NodeInfo
+func (s Service) Lookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
+	name := args.Name
+	key := args.Key
+
 	n, ok := nodes[name]
 	if ok {
-		return n.Lookup(key)
+		i, err := n.Lookup(chord.GenID(key, n.Ring.Modulo))
+		if err != nil {
+			(*reply).Message = "Lookup: not found"
+			return err
+		}
+		(*reply).Message = "Lookup: found"
+		(*reply).Node = i
 	}
-	return i, errors.New("you are not in this ring")
+	return errors.New("you are not in this ring")
 }
 
 //SimpleLookup handles lookup a key in a ring using a simple alghoritm
-func (s Service) SimpleLookup(name string, key uint64) (chord.NodeInfo, error) {
-	var i chord.NodeInfo
+func (s Service) SimpleLookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
+	name := args.Name
+	key := args.Key
+
 	n, ok := nodes[name]
 	if ok {
-		return n.SimpleLookup(key)
+		i, err := n.SimpleLookup(chord.GenID(key, n.Ring.Modulo))
+		if err != nil {
+			(*reply).Message = "Simple lookup: not found"
+			return err
+		}
+		(*reply).Message = "Simple lookup: found"
+		(*reply).Node = i
 	}
-	return i, errors.New("you are not in this ring")
+	return errors.New("you are not in this ring")
 }
 
 func main() {

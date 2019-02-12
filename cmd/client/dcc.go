@@ -5,12 +5,15 @@ import (
   "flag"
   "log"
   "net/rpc"
+  "../../pkg/rpchelper"
 )
 
 var (
   join = flag.Bool("join", false, "Connect to a ring. example: -join -name <name>")
   leave = flag.Bool("leave", false, "Leave a ring. example: -leave -name <name>")
   new = flag.Bool("new", false, "Create a ring. example: -new -name <name>")
+  base = flag.Int("base", 2, "Base for ring modulo. Modulo = Base^Exponent - 1")
+  exponent = flag.Int("exponent", 64, "Exponent for ring modulo.")
   port = flag.Int("port", 6368, "Port for ring's p2p communications. Default 6368. If 0 will be random.")
   lookup = flag.Bool("lookup", false, "Lookup key in a ring. example: -lookup -name <name> -key <key>")
   list = flag.Bool("list", false, "List local nodes and rings.")
@@ -31,28 +34,30 @@ func main() {
   }
 
   var method string
-  args  := make(map[string]interface{})
-  reply := make(map[string]interface{})
+  var args rpchelper.ServiceArgs
+  var reply rpchelper.ServiceReply
 
   if *join {
     method = "Service.Join"
-    args["name"] = *name
-    args["port"] = *port
+    args.Name = *name
+    args.Port = *port
   } else if *new {
     method = "Service.Create"
-    args["name"] = *name
-    args["port"] = *port
+    args.Name = *name
+    args.Port = *port
+    args.Base = *base
+    args.Exponent = *exponent
   } else if *leave {
     method = "Service.Leave"
-    args["name"] = *name
+    args.Name = *name
   } else if *lookup {
     if *simple {
       method = "Service.SimpleLookup"
     } else {
       method = "Service.Lookup"
     }
-    args["name"] = *name
-    args["key"] = *key
+    args.Name = *name
+    args.Key = *key
   } else if *list {
     method = "Service.List"
   }
@@ -60,7 +65,6 @@ func main() {
   err = client.Call(method, args, &reply)
   if err != nil {
     log.Fatal("error:", err)
-  } else {
-    fmt.Println(reply)
   }
+  fmt.Println(reply)
 }
