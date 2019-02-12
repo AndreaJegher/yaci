@@ -18,5 +18,6 @@ type (
   ServiceReply struct {
     Node chord.NodeInfo
     Message string
+    List map[string]chord.Node
   }
 )

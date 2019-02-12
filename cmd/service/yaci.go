@@ -19,12 +19,12 @@ var (
 )
 
 type (
-	//Service holds available chord related services
+	// Service holds available chord related services
 	Service struct {
 	}
 )
 
-//Join handles joinig a ring
+// Join handles joinig a ring
 func (s Service) Join(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	var i chord.NodeInfo
 	name := args.Name
@@ -53,7 +53,7 @@ func (s Service) Join(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply)
 	return nil
 }
 
-//Create handles createing a ring
+// Create handles createing a ring
 func (s Service) Create(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	name := args.Name
 	port := args.Port
@@ -68,7 +68,7 @@ func (s Service) Create(args rpchelper.ServiceArgs, reply *rpchelper.ServiceRepl
 	return nil
 }
 
-//Leave handles leaving a ring
+// Leave handles leaving a ring
 func (s Service) Leave(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	name := args.Name
 	node, ok := nodes[name]
@@ -79,9 +79,13 @@ func (s Service) Leave(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply
 	return errors.New("you are not in this ring")
 }
 
+// List handles leaving a ring
+func (s Service) List(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
+	reply.List = nodes
+	return nil
+}
 
-
-//Lookup handles lookup a key in a ring
+// Lookup handles lookup a key in a ring
 func (s Service) Lookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	name := args.Name
 	key := args.Key
@@ -99,7 +103,7 @@ func (s Service) Lookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceRepl
 	return errors.New("you are not in this ring")
 }
 
-//SimpleLookup handles lookup a key in a ring using a simple alghoritm
+// SimpleLookup handles lookup a key in a ring using a simple alghoritm
 func (s Service) SimpleLookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	name := args.Name
 	key := args.Key
