@@ -25,37 +25,42 @@ var (
 func main() {
   flag.Parse()
 
-  client, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", *chordService, chordServicePort))
+  client, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", *chordService, *chordServicePort))
   if err != nil {
   	log.Fatal("dialing:", err)
   }
 
   var method string
-  var args []string
+  args  := make(map[string]interface{})
+  reply := make(map[string]interface{})
 
   if *join {
     method = "Service.Join"
-    args = []string{*name, fmt.Sprintf("%d",*port)}
+    args["name"] = *name
+    args["port"] = *port
   } else if *new {
     method = "Service.Create"
-    args = []string{*name, fmt.Sprintf("%d",*port)}
+    args["name"] = *name
+    args["port"] = *port
   } else if *leave {
     method = "Service.Leave"
-    args = []string{*name}
+    args["name"] = *name
   } else if *lookup {
     if *simple {
       method = "Service.SimpleLookup"
     } else {
       method = "Service.Lookup"
     }
-    args = []string{*name, *key}
+    args["name"] = *name
+    args["key"] = *key
+  } else if *list {
+    method = "Service.List"
   }
 
-  var reply string
   err = client.Call(method, args, &reply)
   if err != nil {
     log.Fatal("error:", err)
   } else {
-    fmt.Printf(reply)
+    fmt.Println(reply)
   }
 }
