@@ -87,12 +87,13 @@ func (s Service) List(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply)
 
 // Lookup handles lookup a key in a ring
 func (s Service) Lookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
+	var i chord.NodeInfo
 	name := args.Name
 	key := args.Key
 
 	n, ok := nodes[name]
 	if ok {
-		i, err := n.Lookup(chord.GenID(key, n.Ring.Modulo))
+		err := n.Lookup(chord.GenID(key, n.Ring.Modulo), &i)
 		if err != nil {
 			(*reply).Message = "Lookup: not found"
 			return err
@@ -105,12 +106,13 @@ func (s Service) Lookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceRepl
 
 // SimpleLookup handles lookup a key in a ring using a simple alghoritm
 func (s Service) SimpleLookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
+	var i chord.NodeInfo
 	name := args.Name
 	key := args.Key
 
 	n, ok := nodes[name]
 	if ok {
-		i, err := n.SimpleLookup(chord.GenID(key, n.Ring.Modulo))
+		err := n.SimpleLookup(chord.GenID(key, n.Ring.Modulo), &i)
 		if err != nil {
 			(*reply).Message = "Simple lookup: not found"
 			return err
