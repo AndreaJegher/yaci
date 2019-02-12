@@ -95,11 +95,6 @@ func GenID(item string, modulo uint64) uint64 {
 	return binary.LittleEndian.Uint64(sum[12:]) % modulo
 }
 
-// GetPredecessor returns predecessor infos
-func (n Node) GetPredecessor() NodeInfo {
-	return n.Pred
-}
-
 // Create creates a new chord ring and returns a new node
 func Create(name string, port, base int, exponent int) (Node, error) {
 	var n Node
@@ -162,17 +157,39 @@ func Join(i NodeInfo) (Node, error) {
 	return n, nil
 }
 
+// fixFinger refreshes finger table
+func (n Node) fixFinger(key uint64) error {
+	// (n.ID + 2 ^ (next - 1)) % n.Ring.Modulo
+	val, err := n.Lookup(key)
+	if err != nil {
+		return err
+	}
+	n.FingerTable[key] = val
+	return nil
+}
+
+// checkPredecessor check if the predecessor is active
+func (n Node) checkPredecessor() error {
+	_, err := dialNode(n.Pred)
+	return err
+}
+
+// GetPredecessor returns predecessor infos
+func (n Node) GetPredecessor(args interface{}, i *NodeInfo) error {
+	*i = n.Pred
+	return nil
+}
+
 // stabilize verifies immediate successor and notifyies him of itself
 func (n Node) stabilize() error {
 	var x NodeInfo
-	var args map[string]interface{}
 
 	c, err := dialNode(n.Next)
 	if err != nil {
 		return err
 	}
 
-	err = c.Call("Node.GetPredecessor", args, &x)
+	err = c.Call("Node.GetPredecessor", nil, &x)
 	if err != nil {
 		return err
 	}
@@ -194,23 +211,6 @@ func (n Node) Notify(i NodeInfo) {
 	if n.Pred.Address == nil || (n.Pred.Address != nil && keyInRange(i.ID, n.Pred, n.NodeInfo)) {
 		n.Pred = i
 	}
-}
-
-// fixFinger refreshes finger table
-func (n Node) fixFinger(key uint64) error {
-	// (n.ID + 2 ^ (next - 1)) % n.Ring.Modulo
-	val, err := n.Lookup(key)
-	if err != nil {
-		return err
-	}
-	n.FingerTable[key] = val
-	return nil
-}
-
-// checkPredecessor check if the predecessor is active
-func (n Node) checkPredecessor() error {
-	_, err := dialNode(n.Pred)
-	return err
 }
 
 // Lookup finds the node holding the key (scalable implementation)
