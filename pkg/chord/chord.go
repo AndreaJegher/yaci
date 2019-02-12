@@ -128,6 +128,7 @@ func Create(name string, port, base int, exponent int) (Node, error) {
 // Join a chord ring and returns a new node
 func Join(i NodeInfo) (Node, error) {
 	var n Node
+	var next NodeInfo
 
 	c, err := dialNode(i)
 	if err != nil {
@@ -140,7 +141,7 @@ func Join(i NodeInfo) (Node, error) {
 	}
 
 	// newNode.Pred = nil
-	next, err := n.Lookup(GenID(i.Address.String(), n.Ring.Modulo))
+	err = n.Lookup(GenID(i.Address.String(), n.Ring.Modulo), &next)
 	if err != nil {
 		return n, err
 	}
@@ -159,12 +160,12 @@ func Join(i NodeInfo) (Node, error) {
 
 // fixFinger refreshes finger table
 func (n Node) fixFinger(key uint64) error {
-	// (n.ID + 2 ^ (next - 1)) % n.Ring.Modulo
-	val, err := n.Lookup(key)
+	var new NodeInfo
+	err := n.Lookup(key, &new)
 	if err != nil {
 		return err
 	}
-	n.FingerTable[key] = val
+	n.FingerTable[key] = new
 	return nil
 }
 
@@ -172,12 +173,6 @@ func (n Node) fixFinger(key uint64) error {
 func (n Node) checkPredecessor() error {
 	_, err := dialNode(n.Pred)
 	return err
-}
-
-// GetPredecessor returns predecessor infos
-func (n Node) GetPredecessor(args interface{}, i *NodeInfo) error {
-	*i = n.Pred
-	return nil
 }
 
 // stabilize verifies immediate successor and notifyies him of itself
@@ -206,40 +201,50 @@ func (n Node) stabilize() error {
 	return nil
 }
 
+// GetPredecessor returns predecessor infos
+func (n Node) GetPredecessor(args interface{}, i *NodeInfo) error {
+	*i = n.Pred
+	return nil
+}
+
 // Notify handles predecessors notifications
-func (n Node) Notify(i NodeInfo) {
+func (n Node) Notify(i NodeInfo, reply *interface{}) error {
 	if n.Pred.Address == nil || (n.Pred.Address != nil && keyInRange(i.ID, n.Pred, n.NodeInfo)) {
 		n.Pred = i
 	}
+	return nil
 }
 
 // Lookup finds the node holding the key (scalable implementation)
-func (n Node) Lookup(keyID uint64) (NodeInfo, error) {
-	return n.NodeInfo, nil
+func (n Node) Lookup(keyID uint64, i *NodeInfo) error {
+	*i = n.NodeInfo
+	return nil
 }
 
 // SimpleLookup finds the node holding the key (simple implementation)
-func (n Node) SimpleLookup(key uint64) (NodeInfo, error) {
-	var i NodeInfo
-
+func (n Node) SimpleLookup(key uint64, i *NodeInfo) error {
+	var temp NodeInfo
 	if keyInRange(key, n.NodeInfo, n.Next) {
-		return n.Next, nil
+		*i = n.Next
+		return nil
 	}
 
 	c, err := dialNode(n.Next)
 	if err != nil {
-		return i, err
+		return err
 	}
 
-	err = c.Call("Node.SimpleLookup", key, &i)
+	err = c.Call("Node.SimpleLookup", key, &temp)
 	if err != nil {
-		return i, err
+		return err
 	}
 
-	return i, nil
+	*i = temp
+	return nil
 }
 
 // WhichRing returns informations about the current ring
-func (n Node) WhichRing() RingInfo {
-	return n.Ring
+func (n Node) WhichRing(args interface{}, r *RingInfo) error {
+	*r = n.Ring
+	return nil
 }
