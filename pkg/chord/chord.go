@@ -176,6 +176,18 @@ func (n Node) checkPredecessor() error {
 	return err
 }
 
+// closetPreceedingNode return the
+func (n Node) closetPreceedingNode(key uint64) NodeInfo {
+	prev := 1
+	for {
+			if val, ok := n.FingerTable[(key - uint64(prev))%n.Ring.Modulo]; ok {
+				return val
+			}
+			prev = prev + 1
+	}
+	return n.NodeInfo
+}
+
 // stabilize verifies immediate successor and notifyies him of itself
 func (n Node) stabilize() error {
 	var x NodeInfo
@@ -217,8 +229,25 @@ func (n Node) Notify(i NodeInfo, reply *interface{}) error {
 }
 
 // Lookup finds the node holding the key (scalable implementation)
-func (n Node) Lookup(keyID uint64, i *NodeInfo) error {
-	*i = n.NodeInfo
+func (n Node) Lookup(key uint64, i *NodeInfo) error {
+	var temp NodeInfo
+	if keyInRange(key, n.NodeInfo, n.Next) {
+		*i = n.Next
+		return nil
+	}
+
+	next := n.closetPreceedingNode(key)
+	c, err := dialNode(next)
+	if err != nil {
+		return err
+	}
+
+	err = c.Call("Node.Lookup", key, &temp)
+	if err != nil {
+		return err
+	}
+
+	*i = temp
 	return nil
 }
 
