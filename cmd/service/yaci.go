@@ -79,6 +79,8 @@ func (s Service) Leave(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply
 	return errors.New("you are not in this ring")
 }
 
+
+
 //Lookup handles lookup a key in a ring
 func (s Service) Lookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	name := args.Name
@@ -116,12 +118,15 @@ func (s Service) SimpleLookup(args rpchelper.ServiceArgs, reply *rpchelper.Servi
 }
 
 func main() {
-	var s Service
+	flag.Parse()
+
+	s := new(Service)
 	rpc.Register(s)
 	rpc.HandleHTTP()
-	l, e := net.Listen("tcp", fmt.Sprintf(":%d", *chordServicePort))
-	if e != nil {
-		log.Fatal("listen error:", e)
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", *chordServicePort))
+	if err != nil {
+		log.Fatal("listen error:", err)
 	}
-	go http.Serve(l, nil)
+	// TODO use ServeTLS
+	log.Fatalf("Error serving: %s", http.Serve(l, nil))
 }
