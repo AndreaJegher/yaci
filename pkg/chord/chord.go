@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -31,7 +32,7 @@ type (
 
 	//RingInfo holds the ring metadata
 	RingInfo struct {
-		ModuloExponent uint
+		ModuloExponent int
 		ModuloBase     int
 		Modulo         uint64
 		Name           string
@@ -100,7 +101,7 @@ func (n Node) GetPredecessor() NodeInfo {
 }
 
 // Create creates a new chord ring and returns a new node
-func Create(name string, port, base int, exponent uint) (Node, error) {
+func Create(name string, port, base int, exponent int) (Node, error) {
 	var n Node
 
 	rpc.Register(n)
@@ -113,7 +114,7 @@ func Create(name string, port, base int, exponent uint) (Node, error) {
 	n.Ring.Name = name
 	n.Ring.ModuloBase = base
 	n.Ring.ModuloExponent = exponent
-	n.Ring.Modulo = uint64(n.Ring.ModuloBase<<n.Ring.ModuloExponent - 1)
+	n.Ring.Modulo = uint64( math.Pow( float64(n.Ring.ModuloBase), float64(n.Ring.ModuloExponent) ) - 1)
 	n.Port = port
 	ip, err := externalIP()
 	if err != nil {
@@ -157,7 +158,7 @@ func Join(i NodeInfo) (Node, error) {
 	n.ID = GenID(ip.String(), n.Ring.Modulo)
 	n.Next = next
 	n.Running = true
-	
+
 	return n, nil
 }
 
