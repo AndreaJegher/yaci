@@ -132,10 +132,12 @@ func externalIP() (net.IP, error) {
 
 // closetPreceedingNode return the
 func (n Node) closetPreceedingNode(key uint64) NodeInfo {
+	var ti NodeInfo
+	ti.ID = key
 	val := n.NodeInfo
 	for k := range n.FingerTable {
 		temp := n.FingerTable[k]
-		if temp.ID >= val.ID && temp.ID < key {
+		if keyInRange(temp.ID, val, ti) {
 			val = temp
 		}
 	}
