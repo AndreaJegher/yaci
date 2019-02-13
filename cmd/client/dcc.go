@@ -40,7 +40,7 @@ func printRingInfo(r chord.RingInfo) {
   fmt.Printf("\tModulo: %d\n", r.Modulo)
 	fmt.Printf("\tExponent: %d\n", r.ModuloExponent)
 	fmt.Printf("\tBase: %v\n", r.ModuloBase)
-  fmt.Printf("\tTimeout: %d\n", r.Timeout)
+  fmt.Printf("\tTimeout: %d ms\n", r.Timeout)
 }
 
 // Dummy Chord Client
@@ -107,6 +107,7 @@ func main() {
 			log.Fatal("error:", err)
 		}
     for _, n := range reply.List {
+      fmt.Println("***********")
       printNodeInfo(n.NodeInfo)
       printRingInfo(n.Ring)
     }
