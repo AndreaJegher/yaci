@@ -108,8 +108,12 @@ func main() {
 		}
     for _, n := range reply.List {
       fmt.Println("***********")
+			printRingInfo(n.Ring)
       printNodeInfo(n.NodeInfo)
-      printRingInfo(n.Ring)
+			fmt.Println("Next")
+			printNodeInfo(n.Next)
+			fmt.Println("Pred")
+			printNodeInfo(n.Pred)
     }
 	}
 

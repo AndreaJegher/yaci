@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -41,7 +41,7 @@ type (
 	}
 
 	// EmptyArgs empty args
-	EmptyArgs struct {}
+	EmptyArgs struct{}
 )
 
 func (n Node) dialNode(i NodeInfo) (*rpc.Client, bool, error) {
@@ -66,14 +66,12 @@ func serveNode(n *Node) {
 
 	go func() {
 		var next uint64
-		time.Sleep(n.Ring.Timeout * time.Millisecond)
+		rand.Seed(time.Now().Unix())
 		for n.Running {
 			n.stabilize()
 			n.fixFinger(next)
-			next = uint64(math.Pow(float64(next+1), 2) + 1) % n.Ring.Modulo
-			if next == 0 {
-				next = uint64(time.Now().Unix()) % n.Ring.Modulo
-			}
+			next = (next + rand.Uint64()%200) % n.Ring.Modulo
+			fmt.Println(next)
 			n.checkPredecessor()
 			time.Sleep(n.Ring.Timeout * time.Millisecond)
 		}
@@ -153,7 +151,6 @@ func Create(port int, r RingInfo) (*Node, error) {
 // Join a chord ring through i and returns a new node
 func Join(i NodeInfo, port int) (*Node, error) {
 	var n Node
-	var next NodeInfo
 
 	ip, err := externalIP()
 	if err != nil {
@@ -169,23 +166,21 @@ func Join(i NodeInfo, port int) (*Node, error) {
 		return nil, err
 	}
 
-
 	var args EmptyArgs
 	err = c.Call("Node.WhichRing", args, &n.Ring)
 	if err != nil {
 		return &n, err
 	}
 
-	err = n.Lookup(GenID(i.Address.String(), n.Ring.Modulo), &next)
+	n.ID = GenID(n.Address.String(), n.Ring.Modulo)
+	n.Port = port
+	n.Running = true
+	n.FingerTable = make(map[uint64]NodeInfo)
+
+	err = c.Call("Node.Lookup", n.ID, &n.Next)
 	if err != nil {
 		return nil, err
 	}
-
-	n.ID = GenID(n.Address.String(), n.Ring.Modulo)
-	n.Port = port
-	n.Next = next
-	n.Running = true
-	n.FingerTable = make(map[uint64]NodeInfo)
 
 	go serveNode(&n)
 	return &n, nil
@@ -224,9 +219,7 @@ func (n Node) stabilize() error {
 		return err
 	}
 
-
-
-var args EmptyArgs
+	var args EmptyArgs
 	err = c.Call("Node.GetPredecessor", args, &x)
 	if err != nil {
 		return err
