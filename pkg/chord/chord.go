@@ -40,12 +40,15 @@ type (
 	}
 )
 
-func dialNode(i NodeInfo) (*rpc.Client, error) {
+func (n Node) dialNode(i NodeInfo) (*rpc.Client, error) {
+	if n.Address.Equal(i.Address) && n.Port == i.Port {
+			return nil, errors.New("cannot dial myself")
+	}
 	return rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", i.Address, i.Port))
 }
 
 func keyInRange(k uint64, n, s NodeInfo) bool {
-	return k > n.ID && k <= s.ID
+	return (k > n.ID && k <= s.ID) || ( n.ID > s.ID )
 }
 
 func serveNode(n *Node) {
@@ -67,7 +70,7 @@ func serveNode(n *Node) {
 		}
 		l.Close()
 	}()
-	log.Println(http.Serve(l, nil))
+	log.Println("Node ", n.ID, " failing ", http.Serve(l, nil))
 }
 
 func externalIP() (net.IP, error) {
@@ -115,7 +118,7 @@ func GenID(item string, modulo uint64) uint64 {
 }
 
 // Create a chord ring and returns a new node
-func Create(i NodeInfo, r RingInfo) (*Node, error) {
+func Create(port int, r RingInfo) (*Node, error) {
 	var n Node
 	var next NodeInfo
 
@@ -123,10 +126,10 @@ func Create(i NodeInfo, r RingInfo) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	n.Address = ip
 
 	n.Ring = r
-	n.NodeInfo = i
+	n.Port = port
+	n.Address = ip
 	n.ID = GenID(n.Address.String(), n.Ring.Modulo)
 	n.Next = next
 	n.Running = true
@@ -148,7 +151,7 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	}
 	n.Address = ip
 
-	c, err := dialNode(i)
+	c, err := n.dialNode(i)
 	if err != nil {
 		return nil, err
 	}
@@ -173,6 +176,12 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	return &n, nil
 }
 
+// checkPredecessor check if the predecessor is active
+func (n Node) checkPredecessor() error {
+	_, err := n.dialNode(n.Pred)
+	return err
+}
+
 // fixFinger refreshes finger table
 func (n Node) fixFinger(key uint64) error {
 	var new NodeInfo
@@ -184,32 +193,11 @@ func (n Node) fixFinger(key uint64) error {
 	return nil
 }
 
-// checkPredecessor check if the predecessor is active
-func (n Node) checkPredecessor() error {
-	_, err := dialNode(n.Pred)
-	return err
-}
-
-// closetPreceedingNode return the
-func (n Node) closetPreceedingNode(key uint64) NodeInfo {
-	prev := 1
-	for {
-		if val, ok := n.FingerTable[(key-uint64(prev))%n.Ring.Modulo]; ok {
-			return val
-		}
-		prev = prev + 1
-		if uint64(prev) == key {
-			break
-		}
-	}
-	return n.NodeInfo
-}
-
 // stabilize verifies immediate successor and notifyies him of itself
 func (n Node) stabilize() error {
 	var x NodeInfo
 
-	c, err := dialNode(n.Next)
+	c, err := n.dialNode(n.Next)
 	if err != nil {
 		return err
 	}
@@ -229,6 +217,16 @@ func (n Node) stabilize() error {
 	}
 
 	return nil
+}
+
+// closetPreceedingNode return the
+func (n Node) closetPreceedingNode(key uint64) NodeInfo {
+	for x := 0; x <= len(n.FingerTable); x++ {
+		if val, ok := n.FingerTable[(key-uint64(x))%n.Ring.Modulo]; ok {
+			return val
+		}
+	}
+	return n.NodeInfo
 }
 
 // GetPredecessor returns predecessor infos
@@ -254,7 +252,7 @@ func (n Node) Lookup(key uint64, i *NodeInfo) error {
 	}
 
 	next := n.closetPreceedingNode(key)
-	c, err := dialNode(next)
+	c, err := n.dialNode(next)
 	if err != nil {
 		return err
 	}
@@ -276,7 +274,7 @@ func (n Node) SimpleLookup(key uint64, i *NodeInfo) error {
 		return nil
 	}
 
-	c, err := dialNode(n.Next)
+	c, err := n.dialNode(n.Next)
 	if err != nil {
 		return err
 	}
