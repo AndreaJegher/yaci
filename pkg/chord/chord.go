@@ -84,7 +84,7 @@ func serveNode(n *Node) {
 			if err != nil {
 				log.Println("Node ", n.ID, " failing stabilize ", err)
 			}
-			
+
 			time.Sleep(n.Ring.Timeout * time.Millisecond)
 		}
 		l.Close()
@@ -132,12 +132,14 @@ func externalIP() (net.IP, error) {
 
 // closetPreceedingNode return the
 func (n Node) closetPreceedingNode(key uint64) NodeInfo {
-	for x := 0; x <= len(n.FingerTable); x++ {
-		if val, ok := n.FingerTable[(key-uint64(x))%n.Ring.Modulo]; ok {
-			return val
+	val := n.NodeInfo
+	for k := range n.FingerTable {
+		temp := n.FingerTable[k]
+		if temp.ID >= val.ID && temp.ID < key {
+			val = temp
 		}
 	}
-	return n.NodeInfo
+	return val
 }
 
 // GenID generate a valid entity identifier
