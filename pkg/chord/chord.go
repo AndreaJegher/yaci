@@ -89,7 +89,7 @@ func serveNode(n *Node) {
 		}
 		l.Close()
 	}()
-	log.Println("Node ", n.ID, " failing ", http.Serve(l, nil))
+	log.Println("Node", n.ID, "closing", http.Serve(l, nil))
 }
 
 func externalIP() (net.IP, error) {
