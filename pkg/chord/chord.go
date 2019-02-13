@@ -268,7 +268,6 @@ func (n Node) Lookup(key uint64, i *NodeInfo) error {
 	next := n.closetPreceedingNode(key)
 	c, s, err := n.dialNode(next)
 	if err != nil {
-
 		if s {
 			*i = n.NodeInfo
 			return nil
