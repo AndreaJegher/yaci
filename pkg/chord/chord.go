@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -30,7 +31,7 @@ type (
 		Running bool
 	}
 
-	//RingInfo holds the ring metadata
+	// RingInfo holds the ring metadata
 	RingInfo struct {
 		ModuloExponent int
 		ModuloBase     int
@@ -38,6 +39,9 @@ type (
 		Name           string
 		Timeout        time.Duration
 	}
+
+	// EmptyArgs empty args
+	EmptyArgs struct {}
 )
 
 func (n Node) dialNode(i NodeInfo) (*rpc.Client, bool, error) {
@@ -66,7 +70,10 @@ func serveNode(n *Node) {
 		for n.Running {
 			n.stabilize()
 			n.fixFinger(next)
-			next = next + 1
+			next = uint64(math.Pow(float64(next+1), 2) + 1) % n.Ring.Modulo
+			if next == 0 {
+				next = uint64(time.Now().Unix()) % n.Ring.Modulo
+			}
 			n.checkPredecessor()
 			time.Sleep(n.Ring.Timeout * time.Millisecond)
 		}
@@ -162,12 +169,13 @@ func Join(i NodeInfo, port int) (*Node, error) {
 		return nil, err
 	}
 
-	err = c.Call("WhichRing", nil, &n.Ring)
+
+	var args EmptyArgs
+	err = c.Call("Node.WhichRing", args, &n.Ring)
 	if err != nil {
-		return nil, err
+		return &n, err
 	}
 
-	// newNode.Pred = nil
 	err = n.Lookup(GenID(i.Address.String(), n.Ring.Modulo), &next)
 	if err != nil {
 		return nil, err
@@ -216,7 +224,10 @@ func (n Node) stabilize() error {
 		return err
 	}
 
-	err = c.Call("Node.GetPredecessor", nil, &x)
+
+
+var args EmptyArgs
+	err = c.Call("Node.GetPredecessor", args, &x)
 	if err != nil {
 		return err
 	}
@@ -225,7 +236,7 @@ func (n Node) stabilize() error {
 		n.Next = x
 	}
 
-	err = c.Call("Node.Notify", n.NodeInfo, nil)
+	err = c.Call("Node.Notify", n.NodeInfo, &args)
 	if err != nil {
 		return err
 	}
@@ -244,13 +255,13 @@ func (n Node) closetPreceedingNode(key uint64) NodeInfo {
 }
 
 // GetPredecessor returns predecessor infos
-func (n Node) GetPredecessor(args interface{}, i *NodeInfo) error {
+func (n Node) GetPredecessor(args EmptyArgs, i *NodeInfo) error {
 	*i = n.Pred
 	return nil
 }
 
 // Notify handles predecessors notifications
-func (n Node) Notify(i NodeInfo, reply *interface{}) error {
+func (n Node) Notify(i NodeInfo, reply *EmptyArgs) error {
 	if n.Pred.Address == nil || (n.Pred.Address != nil && keyInRange(i.ID, n.Pred, n.NodeInfo)) {
 		n.Pred = i
 	}
@@ -311,7 +322,7 @@ func (n Node) SimpleLookup(key uint64, i *NodeInfo) error {
 }
 
 // WhichRing returns informations about the current ring
-func (n Node) WhichRing(args interface{}, r *RingInfo) error {
+func (n Node) WhichRing(args EmptyArgs, r *RingInfo) error {
 	*r = n.Ring
 	return nil
 }
