@@ -18,6 +18,7 @@ type (
   // ServiceReply reply for yaci service rpc
   ServiceReply struct {
     Node chord.NodeInfo
+    Ring chord.RingInfo
     Message string
     List []chord.Node
   }

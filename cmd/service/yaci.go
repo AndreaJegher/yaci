@@ -42,12 +42,14 @@ func (s Service) CreateRing(args rpchelper.ServiceArgs, reply *rpchelper.Service
 	nodes[args.Name] = node
 
 	(*reply).Node = node.NodeInfo
+	(*reply).Ring = node.Ring
 	return nil
 }
 
 // JoinRing handles joinig a ring
 func (s Service) JoinRing(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	var i chord.NodeInfo
+	var node *chord.Node
 
 	i.Port = args.Port
 	ips, err := net.LookupIP(args.Name)
@@ -57,7 +59,7 @@ func (s Service) JoinRing(args rpchelper.ServiceArgs, reply *rpchelper.ServiceRe
 
 	for pos, ip := range ips {
 		i.Address = ip
-		node, err := chord.Join(i, args.LocalPort)
+		node, err = chord.Join(i, args.LocalPort)
 		if err != nil {
 			log.Println(err)
 			if pos == len(ips)-1 {
@@ -69,6 +71,8 @@ func (s Service) JoinRing(args rpchelper.ServiceArgs, reply *rpchelper.ServiceRe
 		}
 	}
 
+	(*reply).Node = node.NodeInfo
+	(*reply).Ring = node.Ring
 	return nil
 }
 
@@ -126,7 +130,6 @@ func (s Service) SimpleLookup(args rpchelper.ServiceArgs, reply *rpchelper.Servi
 		}
 		(*reply).Message = "Simple lookup: found"
 		(*reply).Node = i
-		return nil
 	}
 	return errors.New("you are not in this ring")
 }
