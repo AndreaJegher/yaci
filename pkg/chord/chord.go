@@ -53,8 +53,8 @@ func (n Node) dialNode(i NodeInfo) (*rpc.Client, bool, error) {
 	return c, false, err
 }
 
-func keyInRange(k uint64, n, s NodeInfo) bool {
-	return (k > n.ID && k <= s.ID) || (n.ID > s.ID)
+func keyInRange(k uint64, b, e NodeInfo) bool {
+	return ((k > b.ID && k <= e.ID) || (b.ID >= e.ID))
 }
 
 func serveNode(n *Node) {
@@ -130,20 +130,6 @@ func externalIP() (net.IP, error) {
 	return ip, errors.New("there are no available network")
 }
 
-// closetPreceedingNode return the
-func (n Node) closetPreceedingNode(key uint64) NodeInfo {
-	var ti NodeInfo
-	ti.ID = key
-	val := n.NodeInfo
-	for k := range n.FingerTable {
-		temp := n.FingerTable[k]
-		if keyInRange(temp.ID, val, ti) {
-			val = temp
-		}
-	}
-	return val
-}
-
 // GenID generate a valid entity identifier
 func GenID(item string, modulo uint64) uint64 {
 	sum := sha1.Sum([]byte(item))
@@ -153,7 +139,6 @@ func GenID(item string, modulo uint64) uint64 {
 // Create a chord ring and returns a new node
 func Create(port int, r RingInfo) (*Node, error) {
 	var n Node
-	var next NodeInfo
 
 	ip, err := externalIP()
 	if err != nil {
@@ -164,7 +149,6 @@ func Create(port int, r RingInfo) (*Node, error) {
 	n.Port = port
 	n.Address = ip
 	n.ID = GenID(n.Address.String(), n.Ring.Modulo)
-	n.Next = next
 	n.Running = true
 	n.FingerTable = make(map[uint64]NodeInfo)
 
@@ -214,8 +198,22 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	return &n, nil
 }
 
+// closetPreceedingNode return the
+func (n *Node) closetPreceedingNode(key uint64) NodeInfo {
+	var ti NodeInfo
+	ti.ID = key
+	val := n.NodeInfo
+	for k := range n.FingerTable {
+		temp := n.FingerTable[k]
+		if keyInRange(temp.ID, val, ti) {
+			val = temp
+		}
+	}
+	return val
+}
+
 // fixFinger refreshes finger table
-func (n Node) fixFinger(key uint64) error {
+func (n *Node) fixFinger(key uint64) error {
 	var new NodeInfo
 	err := n.Lookup(key, &new)
 	if err != nil {
@@ -232,45 +230,47 @@ func (n Node) fixFinger(key uint64) error {
 }
 
 // stabilize verifies immediate successor and notifyies him of itself
-func (n Node) stabilize() error {
+func (n *Node) stabilize() error {
 	var x NodeInfo
 
-	c, s, err := n.dialNode(n.Next)
-	if err != nil {
-		if s {
-			return nil
-		}
+	c, self, err := n.dialNode(n.Next)
+	if err != nil && !self {
 		return err
 	}
 
 	var args EmptyArgs
-	err = c.Call("Node.GetPredecessor", args, &x)
-	if err != nil {
-		return err
+	if !self {
+		err = c.Call("Node.GetPredecessor", args, &x)
+		if err != nil {
+			return err
+		}
+	} else {
+		x = n.Pred
 	}
 
-	if x.Address != nil && keyInRange(x.ID, n.NodeInfo, n.Next) {
+	if x.Address != nil && keyInRange(x.ID, n.NodeInfo, n.Next) && x.ID != n.ID {
 		n.Next = x
 	}
 
-	c, s, err = n.dialNode(n.Next)
-	if err != nil {
-		if s {
-			return nil
-		}
+	c, self, err = n.dialNode(n.Next)
+	if err != nil && !self {
 		return err
 	}
 
-	err = c.Call("Node.Notify", n.NodeInfo, &args)
-	if err != nil {
-		return err
+	if self {
+		n.Notify(n.NodeInfo, &args)
+	} else {
+		err = c.Call("Node.Notify", n.NodeInfo, &args)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 // checkPredecessor check if the predecessor is active
-func (n Node) checkPredecessor() error {
+func (n *Node) checkPredecessor() error {
 	_, s, err := n.dialNode(n.Pred)
 	if s {
 		return nil
@@ -291,7 +291,7 @@ func (n *Node) GetPredecessor(args EmptyArgs, i *NodeInfo) error {
 
 // Notify handles predecessors notifications
 func (n *Node) Notify(i NodeInfo, reply *EmptyArgs) error {
-	if n.Pred.Address == nil || (n.Pred.Address != nil && keyInRange(i.ID, n.Pred, n.NodeInfo)) {
+	if n.Pred.Address == nil || (keyInRange(i.ID, n.Pred, n.NodeInfo) && !((i.ID == n.ID) && n.ID > n.Pred.ID)) {
 		n.Pred = i
 	}
 	return nil
@@ -301,8 +301,10 @@ func (n *Node) Notify(i NodeInfo, reply *EmptyArgs) error {
 func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
 	if keyInRange(key, n.NodeInfo, n.Next) {
-		*i = n.Next
-		return nil
+		if !(key < n.ID && key > n.Next.ID) {
+			*i = n.Next
+			return nil
+		}
 	}
 
 	next := n.closetPreceedingNode(key)
@@ -328,8 +330,11 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 func (n *Node) SimpleLookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
 	if keyInRange(key, n.NodeInfo, n.Next) {
-		*i = n.Next
-		return nil
+		if !(key < n.ID && key > n.Next.ID) {
+			fmt.Println("out in range:", n.Next.ID)
+			*i = n.Next
+			return nil
+		}
 	}
 
 	c, s, err := n.dialNode(n.Next)

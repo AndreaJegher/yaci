@@ -109,7 +109,7 @@ func (s Service) Lookup(args rpchelper.ServiceArgs, reply *rpchelper.ServiceRepl
 			(*reply).Message = "Lookup: not found"
 			return err
 		}
-		(*reply).Message = "Lookup: found"
+		(*reply).Message = fmt.Sprintf("Lookup: found key id: %v", chord.GenID(key, n.Ring.Modulo))
 		(*reply).Node = i
 		return nil
 	}
@@ -129,7 +129,7 @@ func (s Service) SimpleLookup(args rpchelper.ServiceArgs, reply *rpchelper.Servi
 			(*reply).Message = "Simple lookup: not found"
 			return err
 		}
-		(*reply).Message = "Simple lookup: found"
+		(*reply).Message = fmt.Sprintf("Simple lookup: found key id: %v", chord.GenID(key, n.Ring.Modulo))
 		(*reply).Node = i
 		return nil
 	}
