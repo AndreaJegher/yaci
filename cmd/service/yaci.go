@@ -83,6 +83,7 @@ func (s Service) Leave(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply
 	node, ok := nodes[name]
 	if ok {
 		node.Running = false
+		delete(nodes, name)
 		return nil
 	}
 	return errors.New("you are not in this ring")
