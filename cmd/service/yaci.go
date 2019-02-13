@@ -27,19 +27,21 @@ type (
 
 // CreateRing handles createing a ring
 func (s Service) CreateRing(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
-	var i chord.NodeInfo
 	var r chord.RingInfo
 
-	i.Port = args.Port
 	r.Name = args.Name
 	r.ModuloBase = args.Base
 	r.ModuloExponent = args.Exponent
 	r.Modulo = uint64(math.Pow(float64(r.ModuloBase), float64(r.ModuloExponent)) - 1)
-	node, err := chord.Create(i, r)
+	r.Timeout = 1e4
+
+	node, err := chord.Create(args.Port, r)
 	if err != nil {
 		return err
 	}
 	nodes[args.Name] = node
+
+	(*reply).Node = node.NodeInfo
 	return nil
 }
 
