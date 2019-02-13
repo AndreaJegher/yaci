@@ -130,6 +130,7 @@ func (s Service) SimpleLookup(args rpchelper.ServiceArgs, reply *rpchelper.Servi
 		}
 		(*reply).Message = "Simple lookup: found"
 		(*reply).Node = i
+		return nil
 	}
 	return errors.New("you are not in this ring")
 }
