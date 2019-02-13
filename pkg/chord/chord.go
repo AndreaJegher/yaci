@@ -33,11 +33,12 @@ type (
 
 	// RingInfo holds the ring metadata
 	RingInfo struct {
-		ModuloExponent int
-		ModuloBase     int
-		Modulo         uint64
-		Name           string
-		Timeout        time.Duration
+		ModuloExponent       int
+		ModuloBase           int
+		Modulo               uint64
+		Name                 string
+		Timeout              time.Duration
+		FingerTableDimension int
 	}
 
 	// EmptyArgs empty args
@@ -68,11 +69,22 @@ func serveNode(n *Node) {
 		var next uint64
 		rand.Seed(time.Now().Unix())
 		for n.Running {
-			n.stabilize()
-			n.fixFinger(next)
-			next = (next + rand.Uint64()%200) % n.Ring.Modulo
-			fmt.Println(next)
-			n.checkPredecessor()
+			err = n.checkPredecessor()
+			if err != nil {
+				log.Println("Node ", n.ID, " failing check pred ", err)
+			}
+
+			err = n.fixFinger(next)
+			if err != nil {
+				log.Println("Node ", n.ID, " failing fix finger ", err)
+			}
+			next = (next + rand.Uint64()%1000) % n.Ring.Modulo
+
+			err := n.stabilize()
+			if err != nil {
+				log.Println("Node ", n.ID, " failing stabilize ", err)
+			}
+			
 			time.Sleep(n.Ring.Timeout * time.Millisecond)
 		}
 		l.Close()
@@ -118,6 +130,16 @@ func externalIP() (net.IP, error) {
 	return ip, errors.New("there are no available network")
 }
 
+// closetPreceedingNode return the
+func (n Node) closetPreceedingNode(key uint64) NodeInfo {
+	for x := 0; x <= len(n.FingerTable); x++ {
+		if val, ok := n.FingerTable[(key-uint64(x))%n.Ring.Modulo]; ok {
+			return val
+		}
+	}
+	return n.NodeInfo
+}
+
 // GenID generate a valid entity identifier
 func GenID(item string, modulo uint64) uint64 {
 	sum := sha1.Sum([]byte(item))
@@ -143,6 +165,7 @@ func Create(port int, r RingInfo) (*Node, error) {
 	n.FingerTable = make(map[uint64]NodeInfo)
 
 	n.Next = n.NodeInfo
+	n.Pred.Address = nil
 
 	go serveNode(&n)
 	return &n, nil
@@ -176,6 +199,7 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	n.Port = port
 	n.Running = true
 	n.FingerTable = make(map[uint64]NodeInfo)
+	n.Pred.Address = nil
 
 	err = c.Call("Node.Lookup", n.ID, &n.Next)
 	if err != nil {
@@ -186,21 +210,18 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	return &n, nil
 }
 
-// checkPredecessor check if the predecessor is active
-func (n Node) checkPredecessor() error {
-	_, s, err := n.dialNode(n.Pred)
-	if s {
-		return nil
-	}
-	return err
-}
-
 // fixFinger refreshes finger table
 func (n Node) fixFinger(key uint64) error {
 	var new NodeInfo
 	err := n.Lookup(key, &new)
 	if err != nil {
 		return err
+	}
+	if len(n.FingerTable) >= n.Ring.FingerTableDimension {
+		for k := range n.FingerTable {
+			delete(n.FingerTable, k)
+			break
+		}
 	}
 	n.FingerTable[key] = new
 	return nil
@@ -212,7 +233,6 @@ func (n Node) stabilize() error {
 
 	c, s, err := n.dialNode(n.Next)
 	if err != nil {
-
 		if s {
 			return nil
 		}
@@ -225,8 +245,16 @@ func (n Node) stabilize() error {
 		return err
 	}
 
-	if keyInRange(x.ID, n.NodeInfo, n.Next) {
+	if x.Address != nil && keyInRange(x.ID, n.NodeInfo, n.Next) {
 		n.Next = x
+	}
+
+	c, s, err = n.dialNode(n.Next)
+	if err != nil {
+		if s {
+			return nil
+		}
+		return err
 	}
 
 	err = c.Call("Node.Notify", n.NodeInfo, &args)
@@ -237,24 +265,28 @@ func (n Node) stabilize() error {
 	return nil
 }
 
-// closetPreceedingNode return the
-func (n Node) closetPreceedingNode(key uint64) NodeInfo {
-	for x := 0; x <= len(n.FingerTable); x++ {
-		if val, ok := n.FingerTable[(key-uint64(x))%n.Ring.Modulo]; ok {
-			return val
-		}
+// checkPredecessor check if the predecessor is active
+func (n Node) checkPredecessor() error {
+	_, s, err := n.dialNode(n.Pred)
+	if s {
+		return nil
 	}
-	return n.NodeInfo
+	if err != nil {
+		n.Pred.Address = nil
+		n.Pred.Port = 0
+		n.Pred.ID = 0
+	}
+	return nil
 }
 
 // GetPredecessor returns predecessor infos
-func (n Node) GetPredecessor(args EmptyArgs, i *NodeInfo) error {
+func (n *Node) GetPredecessor(args EmptyArgs, i *NodeInfo) error {
 	*i = n.Pred
 	return nil
 }
 
 // Notify handles predecessors notifications
-func (n Node) Notify(i NodeInfo, reply *EmptyArgs) error {
+func (n *Node) Notify(i NodeInfo, reply *EmptyArgs) error {
 	if n.Pred.Address == nil || (n.Pred.Address != nil && keyInRange(i.ID, n.Pred, n.NodeInfo)) {
 		n.Pred = i
 	}
@@ -262,7 +294,7 @@ func (n Node) Notify(i NodeInfo, reply *EmptyArgs) error {
 }
 
 // Lookup finds the node holding the key (scalable implementation)
-func (n Node) Lookup(key uint64, i *NodeInfo) error {
+func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
 	if keyInRange(key, n.NodeInfo, n.Next) {
 		*i = n.Next
@@ -289,7 +321,7 @@ func (n Node) Lookup(key uint64, i *NodeInfo) error {
 }
 
 // SimpleLookup finds the node holding the key (simple implementation)
-func (n Node) SimpleLookup(key uint64, i *NodeInfo) error {
+func (n *Node) SimpleLookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
 	if keyInRange(key, n.NodeInfo, n.Next) {
 		*i = n.Next
@@ -315,7 +347,7 @@ func (n Node) SimpleLookup(key uint64, i *NodeInfo) error {
 }
 
 // WhichRing returns informations about the current ring
-func (n Node) WhichRing(args EmptyArgs, r *RingInfo) error {
+func (n *Node) WhichRing(args EmptyArgs, r *RingInfo) error {
 	*r = n.Ring
 	return nil
 }
