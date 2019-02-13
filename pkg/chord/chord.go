@@ -40,15 +40,16 @@ type (
 	}
 )
 
-func (n Node) dialNode(i NodeInfo) (*rpc.Client, error) {
+func (n Node) dialNode(i NodeInfo) (*rpc.Client, bool, error) {
 	if n.Address.Equal(i.Address) && n.Port == i.Port {
-			return nil, errors.New("cannot dial myself")
+		return nil, true, errors.New("cannot dial myself")
 	}
-	return rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", i.Address, i.Port))
+	c, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", i.Address, i.Port))
+	return c, false, err
 }
 
 func keyInRange(k uint64, n, s NodeInfo) bool {
-	return (k > n.ID && k <= s.ID) || ( n.ID > s.ID )
+	return (k > n.ID && k <= s.ID) || (n.ID > s.ID)
 }
 
 func serveNode(n *Node) {
@@ -61,6 +62,7 @@ func serveNode(n *Node) {
 
 	go func() {
 		var next uint64
+		time.Sleep(n.Ring.Timeout * time.Millisecond)
 		for n.Running {
 			n.stabilize()
 			n.fixFinger(next)
@@ -133,6 +135,7 @@ func Create(port int, r RingInfo) (*Node, error) {
 	n.ID = GenID(n.Address.String(), n.Ring.Modulo)
 	n.Next = next
 	n.Running = true
+	n.FingerTable = make(map[uint64]NodeInfo)
 
 	n.Next = n.NodeInfo
 
@@ -151,8 +154,11 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	}
 	n.Address = ip
 
-	c, err := n.dialNode(i)
+	c, s, err := n.dialNode(i)
 	if err != nil {
+		if s {
+			return &n, nil
+		}
 		return nil, err
 	}
 
@@ -171,6 +177,7 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	n.Port = port
 	n.Next = next
 	n.Running = true
+	n.FingerTable = make(map[uint64]NodeInfo)
 
 	go serveNode(&n)
 	return &n, nil
@@ -178,7 +185,10 @@ func Join(i NodeInfo, port int) (*Node, error) {
 
 // checkPredecessor check if the predecessor is active
 func (n Node) checkPredecessor() error {
-	_, err := n.dialNode(n.Pred)
+	_, s, err := n.dialNode(n.Pred)
+	if s {
+		return nil
+	}
 	return err
 }
 
@@ -197,8 +207,12 @@ func (n Node) fixFinger(key uint64) error {
 func (n Node) stabilize() error {
 	var x NodeInfo
 
-	c, err := n.dialNode(n.Next)
+	c, s, err := n.dialNode(n.Next)
 	if err != nil {
+
+		if s {
+			return nil
+		}
 		return err
 	}
 
@@ -252,8 +266,13 @@ func (n Node) Lookup(key uint64, i *NodeInfo) error {
 	}
 
 	next := n.closetPreceedingNode(key)
-	c, err := n.dialNode(next)
+	c, s, err := n.dialNode(next)
 	if err != nil {
+
+		if s {
+			*i = n.NodeInfo
+			return nil
+		}
 		return err
 	}
 
@@ -274,8 +293,12 @@ func (n Node) SimpleLookup(key uint64, i *NodeInfo) error {
 		return nil
 	}
 
-	c, err := n.dialNode(n.Next)
+	c, s, err := n.dialNode(n.Next)
 	if err != nil {
+		*i = n.NodeInfo
+		if s {
+			return nil
+		}
 		return err
 	}
 
