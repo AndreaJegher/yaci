@@ -46,30 +46,6 @@ type (
 	EmptyArgs struct{}
 )
 
-func (n Node) dialNode(i NodeInfo) (*rpc.Client, bool, error) {
-	if n.Address.Equal(i.Address) && n.Port == i.Port {
-		return nil, true, errors.New("cannot dial myself")
-	}
-	c, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", i.Address, i.Port))
-	return c, false, err
-}
-
-// dialSuccessor dial the first available node trimming the non responsing one
-func (n Node) dialSuccessor() (*rpc.Client, bool, error) {
-	var c *rpc.Client
-	var err error
-	var s bool
-	sc := n.Successors
-	for _, next := range sc {
-		c, s, err = n.dialNode(next)
-		if err == nil || s {
-			return c, s, err
-		}
-		n.Successors = n.Successors[1:]
-	}
-	return c, false, err
-}
-
 func keyInRange(k uint64, b, e NodeInfo) bool {
 	return ((k > b.ID && k <= e.ID) || (b.ID >= e.ID))
 }
@@ -215,6 +191,30 @@ func Join(i NodeInfo, port int) (*Node, error) {
 
 	go serveNode(&n)
 	return &n, nil
+}
+
+func (n Node) dialNode(i NodeInfo) (*rpc.Client, bool, error) {
+	if n.Address.Equal(i.Address) && n.Port == i.Port {
+		return nil, true, errors.New("cannot dial myself")
+	}
+	c, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", i.Address, i.Port))
+	return c, false, err
+}
+
+// dialSuccessor dial the first available node trimming the non responsing one
+func (n Node) dialSuccessor() (*rpc.Client, bool, error) {
+	var c *rpc.Client
+	var err error
+	var s bool
+	sc := n.Successors
+	for _, next := range sc {
+		c, s, err = n.dialNode(next)
+		if err == nil || s {
+			return c, s, err
+		}
+		n.Successors = n.Successors[1:]
+	}
+	return c, false, err
 }
 
 // closetPreceedingNode return the
