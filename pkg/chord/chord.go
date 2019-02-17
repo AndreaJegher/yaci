@@ -17,7 +17,7 @@ type (
 	// Node rapresents a node on a chord node of peers
 	Node struct {
 		NodeInfo
-		Next        NodeInfo
+		Successors        []NodeInfo
 		Pred        NodeInfo
 		FingerTable map[uint64]NodeInfo
 		Ring        RingInfo
@@ -153,7 +153,7 @@ func Create(port int, r RingInfo) (*Node, error) {
 	n.Running = true
 	n.FingerTable = make(map[uint64]NodeInfo)
 
-	n.Next = n.NodeInfo
+	n.Successors = append(n.Successors, n.NodeInfo)
 	n.Pred.Address = nil
 
 	go serveNode(&n)
@@ -190,10 +190,12 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	n.FingerTable = make(map[uint64]NodeInfo)
 	n.Pred.Address = nil
 
-	err = c.Call("Node.Lookup", n.ID, &n.Next)
+	var next NodeInfo
+	err = c.Call("Node.Lookup", n.ID, &next)
 	if err != nil {
 		return nil, err
 	}
+	n.Successors = append(n.Successors, next)
 
 	go serveNode(&n)
 	return &n, nil
@@ -234,7 +236,7 @@ func (n *Node) fixFinger(key uint64) error {
 func (n *Node) stabilize() error {
 	var x NodeInfo
 
-	c, self, err := n.dialNode(n.Next)
+	c, self, err := n.dialNode(n.Successors[0])
 	if err != nil && !self {
 		return err
 	}
@@ -249,11 +251,11 @@ func (n *Node) stabilize() error {
 		x = n.Pred
 	}
 
-	if x.Address != nil && keyInRange(x.ID, n.NodeInfo, n.Next) && x.ID != n.ID {
-		n.Next = x
+	if x.Address != nil && keyInRange(x.ID, n.NodeInfo, n.Successors[0]) && x.ID != n.ID {
+		n.Successors[0] = x
 	}
 
-	c, self, err = n.dialNode(n.Next)
+	c, self, err = n.dialNode(n.Successors[0])
 	if err != nil && !self {
 		return err
 	}
@@ -292,7 +294,7 @@ func (n *Node) GetPredecessor(args EmptyArgs, i *NodeInfo) error {
 
 // GetSuccessor returns successor infos
 func (n *Node) GetSuccessor(args EmptyArgs, i *NodeInfo) error {
-	*i = n.Next
+	*i = n.Successors[0]
 	return nil
 }
 
@@ -307,9 +309,9 @@ func (n *Node) Notify(i NodeInfo, reply *EmptyArgs) error {
 // Lookup finds the node holding the key (scalable implementation)
 func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
-	if keyInRange(key, n.NodeInfo, n.Next) {
-		if !(key < n.ID && key > n.Next.ID) {
-			*i = n.Next
+	if keyInRange(key, n.NodeInfo, n.Successors[0]) {
+		if !(key < n.ID && key > n.Successors[0].ID) {
+			*i = n.Successors[0]
 			return nil
 		}
 	}
@@ -336,15 +338,14 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 // SimpleLookup finds the node holding the key (simple implementation)
 func (n *Node) SimpleLookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
-	if keyInRange(key, n.NodeInfo, n.Next) {
-		if !(key < n.ID && key > n.Next.ID) {
-			fmt.Println("out in range:", n.Next.ID)
-			*i = n.Next
+	if keyInRange(key, n.NodeInfo, n.Successors[0]) {
+		if !(key < n.ID && key > n.Successors[0].ID) {
+			*i = n.Successors[0]
 			return nil
 		}
 	}
 
-	c, s, err := n.dialNode(n.Next)
+	c, s, err := n.dialNode(n.Successors[0])
 	if err != nil {
 		*i = n.NodeInfo
 		if s {
