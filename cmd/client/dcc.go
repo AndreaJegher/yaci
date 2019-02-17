@@ -110,8 +110,10 @@ func main() {
       fmt.Println("***********")
 			printRingInfo(n.Ring)
       printNodeInfo(n.NodeInfo)
-			fmt.Println("Next")
-			printNodeInfo(n.Next)
+			fmt.Println("Successors:", len(n.Successors))
+			for _, next := range n.Successors {
+				printNodeInfo(next)
+			}
 			fmt.Println("Pred")
 			printNodeInfo(n.Pred)
     }
