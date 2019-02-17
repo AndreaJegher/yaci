@@ -282,18 +282,19 @@ func (n *Node) stabilize() error {
 		if err != nil {
 			return err
 		}
-	}
 
-	var ns []NodeInfo
-	err = c.Call("Node.GetSuccessors", args, &ns)
-	if err != nil {
-		return err
-	}
+		var ns []NodeInfo
+		err = c.Call("Node.GetSuccessors", args, &ns)
+		if err != nil {
+			return err
+		}
 
-	n.Successors = append([]NodeInfo{n.Successors[0]}, ns[:len(ns)-1]...)
+		n.Successors = append([]NodeInfo{n.Successors[0]}, ns[:len(ns)-1]...)
 
-	for len(n.Successors) > n.Ring.NextBufferLength {
-		n.Successors = n.Successors[:len(n.Successors)-1]
+		for len(n.Successors) > n.Ring.NextBufferLength {
+			n.Successors = n.Successors[:len(n.Successors)-1]
+		}
+
 	}
 
 	return nil
