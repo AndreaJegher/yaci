@@ -17,7 +17,7 @@ type (
 	// Node rapresents a node on a chord node of peers
 	Node struct {
 		NodeInfo
-		Successors        []NodeInfo
+		Successors  []NodeInfo
 		Pred        NodeInfo
 		FingerTable map[uint64]NodeInfo
 		Ring        RingInfo
@@ -33,12 +33,12 @@ type (
 
 	// RingInfo holds the ring metadata
 	RingInfo struct {
-		ModuloExponent       int
-		ModuloBase           int
-		Modulo               uint64
-		Name                 string
-		Timeout              time.Duration
-		NextBufferLength int
+		ModuloExponent    int
+		ModuloBase        int
+		Modulo            uint64
+		Name              string
+		Timeout           time.Duration
+		NextBufferLength  int
 		FingerTableLength uint64
 	}
 
@@ -222,7 +222,7 @@ func (n *Node) fixFinger(key uint64) error {
 	if err != nil {
 		return err
 	}
-	if uint64(len(n.FingerTable)) >= n.Ring.FingerTableLength % n.Ring.Modulo {
+	if uint64(len(n.FingerTable)) >= n.Ring.FingerTableLength%n.Ring.Modulo {
 		for k := range n.FingerTable {
 			delete(n.FingerTable, k)
 			break
@@ -292,9 +292,9 @@ func (n *Node) GetPredecessor(args EmptyArgs, i *NodeInfo) error {
 	return nil
 }
 
-// GetSuccessor returns successor infos
-func (n *Node) GetSuccessor(args EmptyArgs, i *NodeInfo) error {
-	*i = n.Successors[0]
+// GetSuccessors returns successor infos
+func (n *Node) GetSuccessors(args EmptyArgs, i *[]NodeInfo) error {
+	*i = n.Successors
 	return nil
 }
 
