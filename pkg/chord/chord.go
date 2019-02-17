@@ -331,6 +331,7 @@ func (n *Node) Notify(i NodeInfo, reply *EmptyArgs) error {
 // Lookup finds the node holding the key (scalable implementation)
 func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
+
 	if keyInRange(key, n.NodeInfo, n.Successors[0]) {
 		if !(key < n.ID && key > n.Successors[0].ID) {
 			*i = n.Successors[0]
@@ -346,6 +347,21 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 			return nil
 		}
 		return err
+	}
+
+	var successorsOfClosest []NodeInfo
+	err = c.Call("Node.GetSuccessors", EmptyArgs{}, &successorsOfClosest)
+	if err != nil {
+		return err
+	}
+
+	for _, ni := range successorsOfClosest {
+		if keyInRange(ni.ID, n.NodeInfo, n.Successors[0]) {
+			if !(ni.ID < n.ID && ni.ID > n.Successors[0].ID) {
+				*i = n.Successors[0]
+				return nil
+			}
+		}
 	}
 
 	err = c.Call("Node.Lookup", key, &temp)
