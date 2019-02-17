@@ -217,8 +217,8 @@ func (n Node) dialSuccessor() (*rpc.Client, bool, error) {
 	return c, false, err
 }
 
-// closetPreceedingNode return the
-func (n *Node) closetPreceedingNode(key uint64) NodeInfo {
+// closestPreceedingNode return the
+func (n *Node) closestPreceedingNode(key uint64) NodeInfo {
 	var ti NodeInfo
 	ti.ID = key
 	val := n.NodeInfo
@@ -338,7 +338,7 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 		}
 	}
 
-	next := n.closetPreceedingNode(key)
+	next := n.closestPreceedingNode(key)
 	c, s, err := n.dialNode(next)
 	if err != nil {
 		if s {
