@@ -235,7 +235,6 @@ func (n *Node) fixFinger(key uint64) error {
 // stabilize verifies immediate successor and notifyies him of itself
 func (n *Node) stabilize() error {
 	var x NodeInfo
-
 	c, self, err := n.dialNode(n.Successors[0])
 	if err != nil && !self {
 		return err
@@ -269,6 +268,13 @@ func (n *Node) stabilize() error {
 		}
 	}
 
+	var ns []NodeInfo
+	err = c.Call("Node.GetSuccessors", args, &ns)
+	if err != nil {
+		return err
+	}
+
+	n.Successors = append([]NodeInfo{n.Successors[0]}, ns[:len(ns)-1]...)
 	return nil
 }
 
