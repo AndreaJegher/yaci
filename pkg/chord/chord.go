@@ -38,7 +38,8 @@ type (
 		Modulo               uint64
 		Name                 string
 		Timeout              time.Duration
-		FingerTableDimension int
+		NextBufferLength int
+		FingerTableLength uint64
 	}
 
 	// EmptyArgs empty args
@@ -219,7 +220,7 @@ func (n *Node) fixFinger(key uint64) error {
 	if err != nil {
 		return err
 	}
-	if len(n.FingerTable) >= n.Ring.FingerTableDimension {
+	if uint64(len(n.FingerTable)) >= n.Ring.FingerTableLength % n.Ring.Modulo {
 		for k := range n.FingerTable {
 			delete(n.FingerTable, k)
 			break
@@ -286,6 +287,12 @@ func (n *Node) checkPredecessor() error {
 // GetPredecessor returns predecessor infos
 func (n *Node) GetPredecessor(args EmptyArgs, i *NodeInfo) error {
 	*i = n.Pred
+	return nil
+}
+
+// GetSuccessor returns successor infos
+func (n *Node) GetSuccessor(args EmptyArgs, i *NodeInfo) error {
+	*i = n.Next
 	return nil
 }
 
