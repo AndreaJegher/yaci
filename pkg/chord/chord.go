@@ -217,7 +217,7 @@ func (n Node) dialSuccessor() (*rpc.Client, bool, error) {
 	return c, false, err
 }
 
-// closestPreceedingNode return the
+// closestPreceedingNode returns the closest preciding node in the finger table
 func (n *Node) closestPreceedingNode(key uint64) NodeInfo {
 	var ti NodeInfo
 	ti.ID = key
