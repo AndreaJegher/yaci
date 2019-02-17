@@ -364,9 +364,20 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 	for _, ni := range successorsOfClosest {
 		if keyInRange(ni.ID, n.NodeInfo, n.Successors[0]) {
 			if !(ni.ID < n.ID && ni.ID > n.Successors[0].ID) {
-				*i = n.Successors[0]
+				*i = ni
 				return nil
 			}
+		}
+	}
+
+	if len(successorsOfClosest) > 0 {
+		c, s, err = n.dialNode(successorsOfClosest[len(successorsOfClosest)-1])
+		if err != nil {
+			if s {
+				*i = n.NodeInfo
+				return nil
+			}
+			return err
 		}
 	}
 
