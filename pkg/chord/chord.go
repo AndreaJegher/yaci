@@ -54,6 +54,22 @@ func (n Node) dialNode(i NodeInfo) (*rpc.Client, bool, error) {
 	return c, false, err
 }
 
+// dialSuccessor dial the first available node trimming the non responsing one
+func (n Node) dialSuccessor() (*rpc.Client, bool, error) {
+	var c *rpc.Client
+	var err error
+	var s bool
+	sc := n.Successors
+	for _, next := range sc {
+		c, s, err = n.dialNode(next)
+		if err == nil || s {
+			return c, s, err
+		}
+		n.Successors = n.Successors[1:]
+	}
+	return c, false, err
+}
+
 func keyInRange(k uint64, b, e NodeInfo) bool {
 	return ((k > b.ID && k <= e.ID) || (b.ID >= e.ID))
 }
@@ -235,7 +251,7 @@ func (n *Node) fixFinger(key uint64) error {
 // stabilize verifies immediate successor and notifyies him of itself
 func (n *Node) stabilize() error {
 	var x NodeInfo
-	c, self, err := n.dialNode(n.Successors[0])
+	c, self, err := n.dialSuccessor()
 	if err != nil && !self {
 		return err
 	}
@@ -251,10 +267,10 @@ func (n *Node) stabilize() error {
 	}
 
 	if x.Address != nil && keyInRange(x.ID, n.NodeInfo, n.Successors[0]) && x.ID != n.ID {
-		n.Successors[0] = x
+		n.Successors = append([]NodeInfo{x}, n.Successors...)
 	}
 
-	c, self, err = n.dialNode(n.Successors[0])
+	c, self, err = n.dialSuccessor()
 	if err != nil && !self {
 		return err
 	}
