@@ -17,7 +17,7 @@ var (
 	base             = flag.Int("base", 2, "Base for ring modulo. Modulo = Base^Exponent - 1")
 	exponent         = flag.Int("exponent", 64, "Exponent for ring modulo.")
 	port             = flag.Int("port", 6368, "Port for ring's p2p communications. Default 6368. If 0 will be random.")
-	timeout          = flag.Int("timeout", 2000, "Time out in millisecons for chord ring stabilize.")
+	timeout          = flag.Int("timeout", 2000, "Time in millisecons for chord ring stabilize.")
 	fingerlength     = flag.Int("fingerlength", 50, "Finger table dimensions.")
 	nextlength       = flag.Int("nextlength", 4, "Lenght of successors' buffer.")
 	lookup           = flag.Bool("lookup", false, "Lookup key in a ring. example: -lookup -name <name> -key <key>")

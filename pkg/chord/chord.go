@@ -37,7 +37,7 @@ type (
 		ModuloBase        int
 		Modulo            uint64
 		Name              string
-		Timeout           time.Duration
+		Timeout           int
 		NextBufferLength  int
 		FingerTableLength int
 	}
@@ -78,7 +78,7 @@ func serveNode(n *Node) {
 				log.Println("Node ", n.ID, " failing stabilize ", err)
 			}
 
-			time.Sleep(n.Ring.Timeout * time.Millisecond)
+			time.Sleep( time.Duration(n.Ring.Timeout) * time.Millisecond)
 		}
 		l.Close()
 	}()
