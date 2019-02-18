@@ -289,7 +289,7 @@ func (n *Node) stabilize() error {
 			return err
 		}
 
-		n.Successors = append([]NodeInfo{n.Successors[0]}, ns[:len(ns)-1]...)
+		n.Successors = append([]NodeInfo{n.Successors[0]}, ns...)
 
 		for len(n.Successors) > n.Ring.NextBufferLength {
 			n.Successors = n.Successors[:len(n.Successors)-1]
