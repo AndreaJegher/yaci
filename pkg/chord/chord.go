@@ -338,13 +338,6 @@ func (n *Node) Notify(i NodeInfo, reply *EmptyArgs) error {
 func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
 
-	if keyInRange(key, n.NodeInfo, n.Successors[0]) {
-		if !(key < n.ID && key > n.Successors[0].ID) {
-			*i = n.Successors[0]
-			return nil
-		}
-	}
-
 	next := n.closestPreceedingNode(key)
 	c, s, err := n.dialNode(next)
 	if err != nil {
@@ -355,13 +348,17 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 		return err
 	}
 
-	var successorsOfClosest []NodeInfo
-	err = c.Call("Node.GetSuccessors", EmptyArgs{}, &successorsOfClosest)
+	candidates := append(n.Successors, next)
+
+	var succsOfCPN []NodeInfo
+	err = c.Call("Node.GetSuccessors", EmptyArgs{}, &succsOfCPN)
 	if err != nil {
 		return err
 	}
 
-	for _, ni := range successorsOfClosest {
+	candidates = append(candidates, succsOfCPN...)
+
+	for _, ni := range candidates {
 		if keyInRange(ni.ID, n.NodeInfo, n.Successors[0]) {
 			if !(ni.ID < n.ID && ni.ID > n.Successors[0].ID) {
 				*i = ni
@@ -370,8 +367,8 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 		}
 	}
 
-	if len(successorsOfClosest) > 0 {
-		c, s, err = n.dialNode(successorsOfClosest[len(successorsOfClosest)-1])
+	if len(candidates) > 0 {
+		c, s, err = n.dialNode(candidates[len(candidates)-1])
 		if err != nil {
 			if s {
 				*i = n.NodeInfo
