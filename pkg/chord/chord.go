@@ -337,30 +337,31 @@ func (n *Node) Notify(i NodeInfo, reply *EmptyArgs) error {
 // Lookup finds the node holding the key (scalable implementation)
 func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
+	var candidates []NodeInfo
 
 	next := n.closestPreceedingNode(key)
 	c, s, err := n.dialNode(next)
-	if err != nil {
-		if s {
-			*i = n.NodeInfo
-			return nil
+	if err != nil && !s {
+		return err
+	}
+
+	if s {
+		candidates = n.Successors
+	} else {
+		candidates = append(n.Successors, next)
+		var succsOfCPN []NodeInfo
+		err = c.Call("Node.GetSuccessors", EmptyArgs{}, &succsOfCPN)
+		if err != nil {
+			return err
 		}
-		return err
+		candidates = append(candidates, succsOfCPN...)
 	}
 
-	candidates := append(n.Successors, next)
-
-	var succsOfCPN []NodeInfo
-	err = c.Call("Node.GetSuccessors", EmptyArgs{}, &succsOfCPN)
-	if err != nil {
-		return err
-	}
-
-	candidates = append(candidates, succsOfCPN...)
+	fmt.Println(candidates)
 
 	for _, ni := range candidates {
-		if keyInRange(ni.ID, n.NodeInfo, n.Successors[0]) {
-			if !(ni.ID < n.ID && ni.ID > n.Successors[0].ID) {
+		if keyInRange(key, n.NodeInfo, ni) {
+			if !(key < n.ID && key > ni.ID) {
 				*i = ni
 				return nil
 			}
