@@ -17,6 +17,9 @@ var (
 	base             = flag.Int("base", 2, "Base for ring modulo. Modulo = Base^Exponent - 1")
 	exponent         = flag.Int("exponent", 64, "Exponent for ring modulo.")
 	port             = flag.Int("port", 6368, "Port for ring's p2p communications. Default 6368. If 0 will be random.")
+	timeout          = flag.Int("timeout", 2000, "Time out in millisecons for chord ring stabilize.")
+	fingerlength     = flag.Int("fingerlength", 50, "Finger table dimensions.")
+	nextlength       = flag.Int("nextlength", 4, "Lenght of successors' buffer.")
 	lookup           = flag.Bool("lookup", false, "Lookup key in a ring. example: -lookup -name <name> -key <key>")
 	list             = flag.Bool("list", false, "List local nodes and rings.")
 	simple           = flag.Bool("simple", false, "Use a simpler and less efficient lookup alghoritm. Included only for completeness.")
@@ -37,10 +40,10 @@ func printNodeInfo(i chord.NodeInfo) {
 func printRingInfo(r chord.RingInfo) {
 	fmt.Println("Ring:")
 	fmt.Printf("\tName: %s\n", r.Name)
-  fmt.Printf("\tModulo: %d\n", r.Modulo)
+	fmt.Printf("\tModulo: %d\n", r.Modulo)
 	fmt.Printf("\tExponent: %d\n", r.ModuloExponent)
 	fmt.Printf("\tBase: %v\n", r.ModuloBase)
-  fmt.Printf("\tTimeout: %d ms\n", r.Timeout)
+	fmt.Printf("\tTimeout: %d ms\n", r.Timeout)
 }
 
 // Dummy Chord Client
@@ -65,19 +68,22 @@ func main() {
 			log.Fatal("error:", err)
 		}
 		printNodeInfo(reply.Node)
-    printRingInfo(reply.Ring)
+		printRingInfo(reply.Ring)
 	} else if *new {
 		args.Name = *name
 		args.Port = *port
 		args.Base = *base
 		args.Exponent = *exponent
+		args.Timeout = *timeout
+		args.FingerTableLength = *fingerlength
+		args.NextBufferLength = *nextlength
 
 		err = client.Call("Service.CreateRing", args, &reply)
 		if err != nil {
 			log.Fatal("error:", err)
 		}
 		printNodeInfo(reply.Node)
-    printRingInfo(reply.Ring)
+		printRingInfo(reply.Ring)
 	} else if *leave {
 		args.Name = *name
 
@@ -85,9 +91,9 @@ func main() {
 		if err != nil {
 			log.Fatal("error:", err)
 		}
-    fmt.Println(reply.Message)
+		fmt.Println(reply.Message)
 	} else if *lookup {
-    var method string
+		var method string
 		if *simple {
 			method = "Service.SimpleLookup"
 		} else {
@@ -99,24 +105,24 @@ func main() {
 		if err != nil {
 			log.Fatal("error:", err)
 		}
-    fmt.Println(reply.Message)
-    printNodeInfo(reply.Node)
+		fmt.Println(reply.Message)
+		printNodeInfo(reply.Node)
 	} else if *list {
 		err = client.Call("Service.List", args, &reply)
 		if err != nil {
 			log.Fatal("error:", err)
 		}
-    for _, n := range reply.List {
-      fmt.Println("***********")
+		for _, n := range reply.List {
+			fmt.Println("***********")
 			printRingInfo(n.Ring)
-      printNodeInfo(n.NodeInfo)
+			printNodeInfo(n.NodeInfo)
 			fmt.Println("Successors:", len(n.Successors))
 			for _, next := range n.Successors {
 				printNodeInfo(next)
 			}
 			fmt.Println("Pred")
 			printNodeInfo(n.Pred)
-    }
+		}
 	}
 
 }

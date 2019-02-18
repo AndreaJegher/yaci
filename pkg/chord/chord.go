@@ -39,7 +39,7 @@ type (
 		Name              string
 		Timeout           time.Duration
 		NextBufferLength  int
-		FingerTableLength uint64
+		FingerTableLength int
 	}
 
 	// EmptyArgs empty args
@@ -238,7 +238,7 @@ func (n *Node) fixFinger(key uint64) error {
 	if err != nil {
 		return err
 	}
-	if uint64(len(n.FingerTable)) >= n.Ring.FingerTableLength%n.Ring.Modulo {
+	if len(n.FingerTable) >= n.Ring.FingerTableLength {
 		for k := range n.FingerTable {
 			delete(n.FingerTable, k)
 			break
@@ -356,8 +356,6 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 		}
 		candidates = append(candidates, succsOfCPN...)
 	}
-
-	fmt.Println(candidates)
 
 	for _, ni := range candidates {
 		if keyInRange(key, n.NodeInfo, ni) {

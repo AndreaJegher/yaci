@@ -13,6 +13,9 @@ type (
     Key string
     Base int
     Exponent int
+    Timeout int
+    FingerTableLength int
+    NextBufferLength int
   }
 
   // ServiceReply reply for yaci service rpc

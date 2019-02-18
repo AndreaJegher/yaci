@@ -34,9 +34,9 @@ func (s Service) CreateRing(args rpchelper.ServiceArgs, reply *rpchelper.Service
 	r.ModuloExponent = args.Exponent
 	r.Modulo = uint64(math.Pow(float64(r.ModuloBase), float64(r.ModuloExponent)) - 1)
 	// TODO: make the next three fields parametric
-	r.Timeout = 1e4
-	r.FingerTableLength = 100
-	r.NextBufferLength = 5
+	r.Timeout = args.Timeout
+	r.FingerTableLength = args.FingerTableLength
+	r.NextBufferLength = args.NextBufferLength
 
 	node, err := chord.Create(args.Port, r)
 	if err != nil {
