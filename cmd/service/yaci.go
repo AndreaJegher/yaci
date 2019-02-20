@@ -28,10 +28,10 @@ type (
 func (s Service) CreateRing(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	var r chord.RingInfo
 
-	r.Name = args.Name
+	r.Name = fmt.Sprintf("%s:%d", args.Name, args.Port)
 	r.ModuloBase = args.Base
 	r.ModuloExponent = args.Exponent
-	r.Modulo = uint64(math.Pow(float64(r.ModuloBase), float64(r.ModuloExponent)) - 1)
+	r.Modulo = uint64(math.Pow(float64(r.ModuloBase), float64(r.ModuloExponent)))
 	// TODO: make the next three fields parametric
 	r.Timeout = args.Timeout
 	r.FingerTableLength = args.FingerTableLength
@@ -41,7 +41,7 @@ func (s Service) CreateRing(args rpchelper.ServiceArgs, reply *rpchelper.Service
 	if err != nil {
 		return err
 	}
-	nodes[args.Name] = node
+	nodes[r.Name] = node
 
 	(*reply).Node = node.NodeInfo
 	(*reply).Ring = node.Ring
@@ -66,6 +66,9 @@ func (s Service) JoinRing(args rpchelper.ServiceArgs, reply *rpchelper.ServiceRe
 			log.Printf("node %v not responding\n", i)
 			log.Println(err)
 		}
+	}
+	if err != nil {
+		return err
 	}
 
 	nodes[node.Ring.Name] = node
