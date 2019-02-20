@@ -28,11 +28,16 @@ type (
 func (s Service) CreateRing(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	var r chord.RingInfo
 
-	r.Name = fmt.Sprintf("%s:%d", args.Name, args.Port)
+	_, ok := nodes[args.Name]
+	if ok {
+		return errors.New("cannot create a ring with that name")
+	}
+
+
+	r.Name = args.Name
 	r.ModuloBase = args.Base
 	r.ModuloExponent = args.Exponent
 	r.Modulo = uint64(math.Pow(float64(r.ModuloBase), float64(r.ModuloExponent)))
-	// TODO: make the next three fields parametric
 	r.Timeout = args.Timeout
 	r.FingerTableLength = args.FingerTableLength
 	r.NextBufferLength = args.NextBufferLength
@@ -52,6 +57,11 @@ func (s Service) CreateRing(args rpchelper.ServiceArgs, reply *rpchelper.Service
 func (s Service) JoinRing(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply) error {
 	var i chord.NodeInfo
 	var node *chord.Node
+
+		_, ok := nodes[args.Name]
+		if ok {
+			return errors.New("already joined a ring with that name")
+		}
 
 	i.Port = args.Port
 	ips, err := net.LookupIP(args.Name)
