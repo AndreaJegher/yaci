@@ -7,7 +7,6 @@ import (
 	"log"
 	"math"
 	"net"
-	"net/http"
 	"net/rpc"
 
 	"../../pkg/chord"
@@ -60,19 +59,16 @@ func (s Service) JoinRing(args rpchelper.ServiceArgs, reply *rpchelper.ServiceRe
 		return err
 	}
 
-	for pos, ip := range ips {
+	for _, ip := range ips {
 		i.Address = ip
 		node, err = chord.Join(i, args.LocalPort)
 		if err != nil {
+			log.Printf("node %v not responding\n", i)
 			log.Println(err)
-			if pos == len(ips)-1 {
-				return err
-			}
-		} else {
-			nodes[args.Name] = node
-			break
 		}
 	}
+
+	nodes[node.Ring.Name] = node
 
 	(*reply).Node = node.NodeInfo
 	(*reply).Ring = node.Ring
@@ -86,6 +82,7 @@ func (s Service) Leave(args rpchelper.ServiceArgs, reply *rpchelper.ServiceReply
 	if ok {
 		node.Running = false
 		delete(nodes, name)
+		node = nil
 		return nil
 	}
 	return errors.New("you are not in this ring")
@@ -142,13 +139,14 @@ func (s Service) SimpleLookup(args rpchelper.ServiceArgs, reply *rpchelper.Servi
 func main() {
 	flag.Parse()
 
+	var serviceServer rpc.Server
 	s := new(Service)
-	rpc.Register(s)
-	rpc.HandleHTTP()
+	serviceServer.Register(s)
+
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", *chordServicePort))
 	if err != nil {
 		log.Fatal("listen error:", err)
 	}
-	// TODO use ServeTLS
-	log.Fatalf("Error serving: %s", http.Serve(l, nil))
+
+	serviceServer.Accept(l)
 }

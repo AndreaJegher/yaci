@@ -43,6 +43,7 @@ func printRingInfo(r chord.RingInfo) {
 	fmt.Printf("\tModulo: %d\n", r.Modulo)
 	fmt.Printf("\tExponent: %d\n", r.ModuloExponent)
 	fmt.Printf("\tBase: %v\n", r.ModuloBase)
+	fmt.Printf("\tNextLength: %v\n", r.NextBufferLength)
 	fmt.Printf("\tTimeout: %d ms\n", r.Timeout)
 }
 
@@ -50,7 +51,7 @@ func printRingInfo(r chord.RingInfo) {
 func main() {
 	flag.Parse()
 
-	client, err := rpc.DialHTTP("tcp", fmt.Sprintf("%s:%d", *chordService, *chordServicePort))
+	client, err := rpc.Dial("tcp", fmt.Sprintf("%s:%d", *chordService, *chordServicePort))
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}
