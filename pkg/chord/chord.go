@@ -63,7 +63,7 @@ func serveNode(n *Node) {
 		var next uint64
 		rand.Seed(time.Now().Unix())
 
-		for n.Running {
+		for n !=nil && n.Running {
 			err = n.checkPredecessor()
 			if err != nil {
 				log.Println("Node ", n.ID, " failing check pred ", err)
@@ -326,7 +326,8 @@ func (n *Node) stabilize() error {
 
 // checkPredecessor check if the predecessor is active
 func (n *Node) checkPredecessor() error {
-	_, s, err := n.dialNode(n.Pred)
+	c, s, err := n.dialNode(n.Pred)
+	defer safeClose(c)
 	if s {
 		return nil
 	}
@@ -391,6 +392,7 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 
 	if len(candidates) > 0 {
 		c, s, err = n.dialNode(candidates[len(candidates)-1])
+		defer safeClose(c)
 		if err != nil {
 			if s {
 				*i = n.NodeInfo
