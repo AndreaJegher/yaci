@@ -48,8 +48,7 @@ type (
 )
 
 var (
-	deleteFingerMutex = make(map[uint64]*sync.Mutex)
-	addFingerMutex = make(map[uint64]*sync.Mutex)
+	fingerMutex = make(map[uint64]*sync.Mutex)
 	// successorsMutex = make(map[uint64]*sync.Mutex)
 )
 
@@ -175,8 +174,7 @@ func Create(port int, r RingInfo) (*Node, error) {
 	n.Address = ip
 	n.Salt = rand.Intn(1000)
 	n.ID = GenID(fmt.Sprintf("%s:%d:%d", n.Address.String(), n.Port, n.Salt), n.Ring.Modulo)
-	addFingerMutex[n.ID] = &sync.Mutex{}
-	deleteFingerMutex[n.ID] = &sync.Mutex{}
+	fingerMutex[n.ID] = &sync.Mutex{}
 	// successorsMutex[n.ID] = &sync.Mutex{}
 	n.Running = true
 	n.FingerTable = make(map[uint64]NodeInfo)
@@ -213,8 +211,7 @@ func Join(i NodeInfo, port int) (*Node, error) {
 
 	n.Salt = rand.Intn(1000)
 	n.ID = GenID(fmt.Sprintf("%s:%d:%d", n.Address.String(), n.Port, n.Salt), n.Ring.Modulo)
-	addFingerMutex[n.ID] = &sync.Mutex{}
-	deleteFingerMutex[n.ID] = &sync.Mutex{}
+	fingerMutex[n.ID] = &sync.Mutex{}
 	// successorsMutex[n.ID] = &sync.Mutex{}
 	n.Port = port
 	n.Running = true
@@ -276,11 +273,11 @@ func (n *Node) closestPreceedingNode(key uint64) NodeInfo {
 
 // fixFinger refreshes finger table
 func (n *Node) fixFinger(key uint64) error {
+	fingerMutex[n.ID].Lock()
+	defer fingerMutex[n.ID].Unlock()
 	if len(n.FingerTable) > n.Ring.FingerTableLength {
 		for k := range n.FingerTable {
-			deleteFingerMutex[n.ID].Lock()
 			delete(n.FingerTable, k)
-			deleteFingerMutex[n.ID].Unlock()
 			return nil
 		}
 	} else {
@@ -291,9 +288,7 @@ func (n *Node) fixFinger(key uint64) error {
 		}
 
 		if !n.equal(new) {
-			addFingerMutex[n.ID].Lock()
 			n.FingerTable[key] = new
-			addFingerMutex[n.ID].Unlock()
 		}
 	}
 	return nil
