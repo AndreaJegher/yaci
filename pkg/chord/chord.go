@@ -286,10 +286,7 @@ func (n *Node) fixFinger(key uint64) error {
 		if err != nil {
 			return err
 		}
-
-		if !n.equal(new) {
-			n.FingerTable[key] = new
-		}
+		n.FingerTable[key] = new
 	}
 	return nil
 }
