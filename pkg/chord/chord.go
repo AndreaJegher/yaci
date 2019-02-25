@@ -48,8 +48,9 @@ type (
 )
 
 var (
-	fingerMutex     = make(map[uint64]*sync.Mutex)
-	successorsMutex = make(map[uint64]*sync.Mutex)
+	fingerMutex      = make(map[uint64]*sync.Mutex)
+	successorsMutex  = make(map[uint64]*sync.Mutex)
+	predecessorMutex = make(map[uint64]*sync.Mutex)
 )
 
 func keyInRange(k uint64, b, e NodeInfo) bool {
@@ -176,6 +177,7 @@ func Create(port int, r RingInfo) (*Node, error) {
 	n.ID = GenID(fmt.Sprintf("%s:%d:%d", n.Address.String(), n.Port, n.Salt), n.Ring.Modulo)
 	fingerMutex[n.ID] = &sync.Mutex{}
 	successorsMutex[n.ID] = &sync.Mutex{}
+	predecessorMutex[n.ID] = &sync.Mutex{}
 
 	n.Running = true
 	n.FingerTable = make(map[uint64]NodeInfo)
@@ -214,6 +216,7 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	n.ID = GenID(fmt.Sprintf("%s:%d:%d", n.Address.String(), n.Port, n.Salt), n.Ring.Modulo)
 	fingerMutex[n.ID] = &sync.Mutex{}
 	successorsMutex[n.ID] = &sync.Mutex{}
+	predecessorMutex[n.ID] = &sync.Mutex{}
 
 	n.Port = port
 	n.Running = true
@@ -315,7 +318,9 @@ func (n *Node) stabilize() error {
 			return err
 		}
 	} else {
+		predecessorMutex[n.ID].Lock()
 		x = n.Pred
+		predecessorMutex[n.ID].Unlock()
 	}
 
 	successorsMutex[n.ID].Lock()
@@ -332,7 +337,9 @@ func (n *Node) stabilize() error {
 
 	if self {
 		n.Notify(n.NodeInfo, &args)
+		successorsMutex[n.ID].Lock()
 		n.Successors = append([]NodeInfo{n.NodeInfo}, n.Successors...)
+		successorsMutex[n.ID].Unlock()
 	} else {
 		err = c.Call("Node.Notify", n.NodeInfo, &args)
 		if err != nil {
@@ -345,7 +352,9 @@ func (n *Node) stabilize() error {
 			return err
 		}
 
+		successorsMutex[n.ID].Lock()
 		n.Successors = append([]NodeInfo{n.Successors[0]}, ns...)
+		successorsMutex[n.ID].Unlock()
 	}
 
 	successorsMutex[n.ID].Lock()
@@ -359,6 +368,8 @@ func (n *Node) stabilize() error {
 
 // checkPredecessor check if the predecessor is active
 func (n *Node) checkPredecessor() error {
+	predecessorMutex[n.ID].Lock()
+	defer predecessorMutex[n.ID].Unlock()
 	c, s, err := n.dialNode(n.Pred)
 	defer safeClose(c)
 	if s {
@@ -374,23 +385,29 @@ func (n *Node) checkPredecessor() error {
 
 // GetPredecessor returns predecessor infos
 func (n *Node) GetPredecessor(args EmptyArgs, i *NodeInfo) error {
+	predecessorMutex[n.ID].Lock()
 	*i = n.Pred
+	predecessorMutex[n.ID].Unlock()
 	return nil
 }
 
 // GetSuccessors returns successor infos
 func (n *Node) GetSuccessors(args EmptyArgs, i *[]NodeInfo) error {
-	// successorsMutex[n.ID].Lock()
+	successorsMutex[n.ID].Lock()
 	*i = n.Successors
-	// successorsMutex[n.ID].Unlock()
+	successorsMutex[n.ID].Unlock()
 	return nil
 }
 
 // Notify handles predecessors notifications
 func (n *Node) Notify(i NodeInfo, reply *EmptyArgs) error {
+
+	predecessorMutex[n.ID].Lock()
 	if n.Pred.Address == nil || ((n.NodeInfo.equal(n.Pred) || keyInRange(i.ID, n.Pred, n.NodeInfo)) && !n.equal(i)) {
 		n.Pred = i
 	}
+
+	predecessorMutex[n.ID].Unlock()
 	return nil
 }
 
