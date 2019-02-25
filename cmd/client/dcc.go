@@ -18,10 +18,11 @@ var (
 	exponent         = flag.Int("exponent", 64, "Exponent for ring modulo.")
 	port             = flag.Int("port", 6368, "Port for ring's p2p communications. Default 6368. If 0 will be random.")
 	timeout          = flag.Int("timeout", 2000, "Time in millisecons for chord ring stabilize.")
-	fingerlength     = flag.Int("fingerlength", 50, "Finger table dimensions.")
+	fingerlength     = flag.Int("fingerlength", 5, "Finger table dimensions.")
 	nextlength       = flag.Int("nextlength", 4, "Lenght of successors' buffer.")
 	lookup           = flag.Bool("lookup", false, "Lookup key in a ring. example: -lookup -name <name> -key <key>")
 	list             = flag.Bool("list", false, "List local nodes and rings.")
+	finger             = flag.Bool("finger", false, "List also local nodes finger tables.")
 	simple           = flag.Bool("simple", false, "Use a simpler and less efficient lookup alghoritm. Included only for completeness.")
 	name             = flag.String("name", "homering.ga", "Hostname of a ring.")
 	remoteport       = flag.Int("remoteport", 6368, "Port of the host when joining.")
@@ -123,6 +124,11 @@ func main() {
 			}
 			fmt.Println("Pred")
 			printNodeInfo(n.Pred)
+			fmt.Println("Finger table:", len(n.FingerTable))
+			for k := range n.FingerTable {
+				fmt.Println(k)
+				printNodeInfo(n.FingerTable[k])
+			}
 		}
 	}
 
