@@ -9,8 +9,8 @@ import (
 	"math/rand"
 	"net"
 	"net/rpc"
-	"time"
 	"sync"
+	"time"
 )
 
 type (
@@ -21,7 +21,7 @@ type (
 		Pred        NodeInfo
 		FingerTable map[uint64]NodeInfo
 		Ring        RingInfo
-		Running bool
+		Running     bool
 	}
 
 	// NodeInfo holds information about a node
@@ -70,7 +70,7 @@ func serveNode(n *Node) {
 		var next uint64
 		rand.Seed(time.Now().Unix())
 
-		for n !=nil && n.Running {
+		for n != nil && n.Running {
 			err = n.checkPredecessor()
 			if err != nil {
 				log.Println("Node ", n.ID, " failing check pred ", err)
@@ -260,6 +260,9 @@ func (n Node) dialSuccessor() (*rpc.Client, bool, error) {
 // closestPreceedingNode returns the closest preciding node in the finger table
 func (n *Node) closestPreceedingNode(key uint64) NodeInfo {
 	var ti NodeInfo
+	fingerMutex[n.ID].Lock()
+	defer fingerMutex[n.ID].Unlock()
+
 	ti.ID = key
 	val := n.NodeInfo
 	for k := range n.FingerTable {
@@ -274,20 +277,23 @@ func (n *Node) closestPreceedingNode(key uint64) NodeInfo {
 // fixFinger refreshes finger table
 func (n *Node) fixFinger(key uint64) error {
 	fingerMutex[n.ID].Lock()
-	defer fingerMutex[n.ID].Unlock()
 	if len(n.FingerTable) > n.Ring.FingerTableLength {
 		for k := range n.FingerTable {
 			delete(n.FingerTable, k)
-			return nil
+			break
 		}
-	} else {
-		var new NodeInfo
-		err := n.Lookup(key, &new)
-		if err != nil {
-			return err
-		}
-		n.FingerTable[key] = new
 	}
+	fingerMutex[n.ID].Unlock()
+
+	var new NodeInfo
+	err := n.Lookup(key, &new)
+	if err != nil {
+		return err
+	}
+
+	fingerMutex[n.ID].Lock()
+	n.FingerTable[key] = new
+	fingerMutex[n.ID].Unlock()
 	return nil
 }
 
