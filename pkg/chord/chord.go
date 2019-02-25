@@ -48,8 +48,8 @@ type (
 )
 
 var (
-	fingerMutex = make(map[uint64]*sync.Mutex)
-	// successorsMutex = make(map[uint64]*sync.Mutex)
+	fingerMutex     = make(map[uint64]*sync.Mutex)
+	successorsMutex = make(map[uint64]*sync.Mutex)
 )
 
 func keyInRange(k uint64, b, e NodeInfo) bool {
@@ -175,7 +175,8 @@ func Create(port int, r RingInfo) (*Node, error) {
 	n.Salt = rand.Intn(1000)
 	n.ID = GenID(fmt.Sprintf("%s:%d:%d", n.Address.String(), n.Port, n.Salt), n.Ring.Modulo)
 	fingerMutex[n.ID] = &sync.Mutex{}
-	// successorsMutex[n.ID] = &sync.Mutex{}
+	successorsMutex[n.ID] = &sync.Mutex{}
+
 	n.Running = true
 	n.FingerTable = make(map[uint64]NodeInfo)
 
@@ -212,7 +213,8 @@ func Join(i NodeInfo, port int) (*Node, error) {
 	n.Salt = rand.Intn(1000)
 	n.ID = GenID(fmt.Sprintf("%s:%d:%d", n.Address.String(), n.Port, n.Salt), n.Ring.Modulo)
 	fingerMutex[n.ID] = &sync.Mutex{}
-	// successorsMutex[n.ID] = &sync.Mutex{}
+	successorsMutex[n.ID] = &sync.Mutex{}
+
 	n.Port = port
 	n.Running = true
 	n.FingerTable = make(map[uint64]NodeInfo)
@@ -243,8 +245,8 @@ func (n Node) dialSuccessor() (*rpc.Client, bool, error) {
 	var err error
 	var s bool
 
-	// successorsMutex[n.ID].Lock()
-	// defer uccessorsMutex[n.ID].Unlock()
+	successorsMutex[n.ID].Lock()
+	defer successorsMutex[n.ID].Unlock()
 
 	sc := n.Successors
 	for _, next := range sc {
@@ -316,12 +318,11 @@ func (n *Node) stabilize() error {
 		x = n.Pred
 	}
 
-	// successorsMutex[n.ID].Lock()
-	// defer successorsMutex[n.ID].Unlock()
-
+	successorsMutex[n.ID].Lock()
 	if x.Address != nil && (len(n.Successors) < 1 || keyInRange(x.ID, n.NodeInfo, n.Successors[0])) {
 		n.Successors = append([]NodeInfo{x}, n.Successors...)
 	}
+	successorsMutex[n.ID].Unlock()
 
 	c, self, err = n.dialSuccessor()
 	defer safeClose(c)
@@ -347,9 +348,11 @@ func (n *Node) stabilize() error {
 		n.Successors = append([]NodeInfo{n.Successors[0]}, ns...)
 	}
 
+	successorsMutex[n.ID].Lock()
 	for len(n.Successors) > n.Ring.NextBufferLength {
 		n.Successors = n.Successors[:len(n.Successors)-1]
 	}
+	successorsMutex[n.ID].Unlock()
 
 	return nil
 }
@@ -403,22 +406,21 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 		return err
 	}
 
-	// successorsMutex[n.ID].Lock()
+	successorsMutex[n.ID].Lock()
 
 	if s {
 		candidates = n.Successors
+		successorsMutex[n.ID].Unlock()
 	} else {
 		candidates = append(n.Successors, next)
+		successorsMutex[n.ID].Unlock()
 		var succsOfCPN []NodeInfo
 		err = c.Call("Node.GetSuccessors", EmptyArgs{}, &succsOfCPN)
 		if err != nil {
-			// successorsMutex[n.ID].Unlock()
 			return err
 		}
 		candidates = append(candidates, succsOfCPN...)
 	}
-
-	// successorsMutex[n.ID].Unlock()
 
 	for _, ni := range candidates {
 		if keyInRange(key, n.NodeInfo, ni) {
@@ -452,17 +454,16 @@ func (n *Node) Lookup(key uint64, i *NodeInfo) error {
 func (n *Node) SimpleLookup(key uint64, i *NodeInfo) error {
 	var temp NodeInfo
 
-	// successorsMutex[n.ID].Lock()
-	// successorsMutex[n.ID].Unlock()
-
+	successorsMutex[n.ID].Lock()
 	if keyInRange(key, n.NodeInfo, n.Successors[0]) {
 		*i = n.Successors[0]
-		// successorsMutex[n.ID].Unlock()
+		successorsMutex[n.ID].Unlock()
 		return nil
 	}
 
 	c, s, err := n.dialNode(n.Successors[0])
-	// successorsMutex[n.ID].Unlock()
+	successorsMutex[n.ID].Unlock()
+
 	defer safeClose(c)
 	if err != nil {
 		*i = n.NodeInfo
