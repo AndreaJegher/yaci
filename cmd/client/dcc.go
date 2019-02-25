@@ -22,7 +22,7 @@ var (
 	nextlength       = flag.Int("nextlength", 4, "Lenght of successors' buffer.")
 	lookup           = flag.Bool("lookup", false, "Lookup key in a ring. example: -lookup -name <name> -key <key>")
 	list             = flag.Bool("list", false, "List local nodes and rings.")
-	finger             = flag.Bool("finger", false, "List also local nodes finger tables.")
+	finger           = flag.Bool("finger", false, "List also local nodes finger tables.")
 	simple           = flag.Bool("simple", false, "Use a simpler and less efficient lookup alghoritm. Included only for completeness.")
 	name             = flag.String("name", "homering.ga", "Hostname of a ring.")
 	remoteport       = flag.Int("remoteport", 6368, "Port of the host when joining.")
@@ -124,10 +124,13 @@ func main() {
 			}
 			fmt.Println("Pred")
 			printNodeInfo(n.Pred)
-			fmt.Println("Finger table:", len(n.FingerTable))
-			for k := range n.FingerTable {
-				fmt.Println(k)
-				printNodeInfo(n.FingerTable[k])
+			if *finger {
+
+				fmt.Println("Finger table:", len(n.FingerTable))
+				for k := range n.FingerTable {
+					fmt.Println(k)
+					printNodeInfo(n.FingerTable[k])
+				}
 			}
 		}
 	}
