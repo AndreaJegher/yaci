@@ -6,8 +6,7 @@ import (
 	"log"
 	"net/rpc"
 
-	"../../pkg/chord"
-	"../../pkg/rpchelper"
+	"github.com/yaci/pkg/chord"
 )
 
 var (
@@ -57,8 +56,8 @@ func main() {
 		log.Fatal("dialing:", err)
 	}
 
-	var args rpchelper.ServiceArgs
-	var reply rpchelper.ServiceReply
+	var args chord.ServiceArgs
+	var reply chord.ServiceReply
 
 	if *join {
 		args.Name = *name

@@ -45,6 +45,27 @@ type (
 
 	// EmptyArgs empty args
 	EmptyArgs struct{}
+
+	// ServiceArgs arguments for yaci service rpc
+	ServiceArgs struct {
+		Name              string
+		Port              int
+		LocalPort         int
+		Key               string
+		Base              int
+		Exponent          int
+		Timeout           int
+		FingerTableLength int
+		NextBufferLength  int
+	}
+
+	// ServiceReply reply for yaci service rpc
+	ServiceReply struct {
+		Node    NodeInfo
+		Ring    RingInfo
+		Message string
+		List    []Node
+	}
 )
 
 var (
